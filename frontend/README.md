@@ -63,6 +63,14 @@ public/worklets/pcm-capture.js  AudioWorkletProcessor (mono downmix only)
 - **Transcript**: polls `segments?after_sequence=<cursor>` every 2 s while recording (and while
   `processing_lag_ms > 0`), merges only unseen sequences, shows `gap` segments as visible breaks. History slider +
   “Vrati se uživo”.
+- **Browser transcript (Web Speech API)**: the “Transkript u pregledaču” panel on the talk page
+  (`src/audio/webSpeech.ts`, `src/components/WebSpeechPanel.tsx`). It uses `SpeechRecognition` /
+  `webkitSpeechRecognition` (Chrome, Edge; not Firefox) with continuous and interim results, sr-RS/hr-HR/en-US.
+  The browser ends sessions after silence, so the panel restarts them automatically. Results become
+  local `ws-N` segments shown in the same transcript view while there is no server recording. **This is
+  not Gemma**: Chrome/Edge send the audio to the vendor's speech service. That is why the UI carries the label
+  “nije Gemma”. The text stays on the device: it is not sent to the backend, it is not the authoritative
+  transcript for question evaluation, and catch-up/explanations still need a server recording.
 - **Izgubio sam nit**: 30 s / 1 min / 3 min / from start, computed from the latest segment `end_ms`.
 - **Explanations**: select text in the transcript (or type a term) → drawer; depth buttons re-query backend.
   `retrieval_mode: general` is labeled “Opšte znanje modela — bez web izvora”. Only http(s) links, opened with

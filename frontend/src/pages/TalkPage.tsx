@@ -7,6 +7,7 @@ import { ExplanationDrawer } from '../components/ExplanationDrawer'
 import { QuestionDrawer, QuestionFab } from '../components/QuestionDrawer'
 import { RecorderControls } from '../components/RecorderControls'
 import { Transcript, type TextSelection, type TranscriptHandle } from '../components/Transcript'
+import { useWebSpeech, WebSpeechPanel } from '../components/WebSpeechPanel'
 import { Button, ErrorAlert, Notice } from '../components/ui'
 import { useApi, useRecorder } from '../services'
 
@@ -23,6 +24,9 @@ export function TalkPage() {
   const transcript = useTranscript(recordingId, polling)
   const segments = transcript.data?.segments ?? []
   const transcriptRef = useRef<TranscriptHandle>(null)
+  const ws = useWebSpeech()
+  // Browser (Web Speech API) transcript is shown when there is no server recording for this talk.
+  const showWebSpeech = !recordingId && (ws.snap.status === 'listening' || ws.snap.segments.length > 0 || !!ws.snap.interim)
 
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [explain, setExplain] = useState<{ term: string; segmentId: string | null } | null>(null)
@@ -52,6 +56,7 @@ export function TalkPage() {
       {talks.isError && <ErrorAlert error={talks.error} onRetry={() => talks.refetch()} />}
 
       <RecorderControls talkId={talkId} eventId={eventId} talkEnded={talk?.status === 'ended'} />
+      <WebSpeechPanel />
 
       {hasRole(me.data?.roles, 'organizer') && recordingId && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -71,7 +76,7 @@ export function TalkPage() {
         </Button>
       </div>
 
-      {!recordingId && (
+      {!recordingId && !showWebSpeech && (
         <Notice>
           Transkript, „Izgubio sam nit" i objašnjenja pojmova rade nad snimkom sa vašeg telefona. Pitanje govorniku možete postaviti i bez
           snimanja.
@@ -81,6 +86,17 @@ export function TalkPage() {
 
       {recordingId && (
         <Transcript ref={transcriptRef} segments={segments} lagMs={transcript.data?.lagMs ?? 0} onSelectText={setSelection} />
+      )}
+
+      {showWebSpeech && (
+        <div className="space-y-2">
+          <Transcript segments={ws.snap.segments} lagMs={0} onSelectText={() => undefined} />
+          {ws.snap.interim && (
+            <p className="rounded-lg bg-slate-50 px-4 py-2 text-lg text-slate-500 italic" aria-live="polite">
+              {ws.snap.interim}…
+            </p>
+          )}
+        </div>
       )}
 
       {selection && (
