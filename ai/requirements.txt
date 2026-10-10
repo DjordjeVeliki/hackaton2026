@@ -10,3 +10,4 @@ anyio==4.15.1
 python-multipart==0.0.32
 python-dotenv==1.2.3
 numpy==2.2.6
+truststore==0.10.4

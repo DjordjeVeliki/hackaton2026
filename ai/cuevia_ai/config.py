@@ -52,7 +52,7 @@ def _env_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     ai_service_token: str = ""
-    gemma_provider: str = "openai_compatible"
+    gemma_provider: str = "google"
     gemma_api_key: str = ""
     gemma_model: str = ""
     gemma_api_base_url: str = ""
@@ -111,7 +111,7 @@ def load_settings(env_file: Path | None = None, *, use_env_file: bool = True) ->
         load_dotenv(env_file or AI_DIR / ".env", override=False)
     return Settings(
         ai_service_token=_env("AI_SERVICE_TOKEN"),
-        gemma_provider=_env("GEMMA_PROVIDER", "openai_compatible").lower(),
+        gemma_provider=_env("GEMMA_PROVIDER", "google").lower(),
         gemma_api_key=_env("GEMMA_API_KEY"),
         gemma_model=_env("GEMMA_MODEL"),
         gemma_api_base_url=_env("GEMMA_API_BASE_URL").rstrip("/"),

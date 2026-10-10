@@ -5,8 +5,10 @@ Base URL: `http://localhost:8001/internal/v1`. Every route except `/health` need
 `{"error":{"code":"...","message":"...","request_id":"..."}}`; you can pass `X-Request-ID` to
 correlate logs (it is echoed back).
 
-Responses below are **real outputs** from `gemma4:e2b` via local Ollama (2026-10-11 smoke run),
-lightly truncated. Inputs are the synthetic fixtures in `ai/tests/fixtures/`.
+Responses below are **real outputs** from the first smoke run (local `gemma4:e2b`, 2026-10-11),
+lightly truncated. The service now runs on hosted `gemma-4-26b-a4b-it` by default, so `model_id`
+will read `gemma-4-26b-a4b-it`. Inputs are the synthetic fixtures in `ai/tests/fixtures/`.
+With hosted Gemma only, `/transcribe` returns 503 `AUDIO_UNAVAILABLE` (hosted Gemma 4 has no audio input).
 
 ## Health
 

@@ -33,6 +33,7 @@ import httpx
 
 from .config import Settings, is_allowed_gemma_model
 from .errors import AIServiceError
+from .net import async_client
 
 log = logging.getLogger("cuevia_ai.gemma")
 
@@ -113,7 +114,7 @@ class GemmaClient:
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(timeout=httpx.Timeout(self.s.gemma_timeout_seconds, connect=10.0))
+            self._http = async_client(self.s.gemma_timeout_seconds)
         return self._http
 
     async def aclose(self) -> None:
@@ -164,10 +165,19 @@ class GemmaClient:
         gen: Optional[Generation] = None
         try:
             async with self._sem:
-                if self.s.gemma_provider == "openai_compatible":
-                    gen = await self._generate_openai(prompt, max_tokens, json_output, temperature)
-                else:
-                    gen = await self._generate_google(prompt, max_tokens, temperature)
+                for attempt in (1, 2):
+                    try:
+                        if self.s.gemma_provider == "openai_compatible":
+                            gen = await self._generate_openai(prompt, max_tokens, json_output, temperature)
+                        else:
+                            gen = await self._generate_google(prompt, max_tokens, json_output, temperature)
+                        break
+                    except httpx.HTTPStatusError as exc:
+                        # One retry for transient provider errors (observed: intermittent 500s on hosted Gemma).
+                        if attempt == 2 or exc.response.status_code not in (429, 500, 502, 503):
+                            raise
+                        log.info("gemma_transient_retry route=%s status=%s", route, exc.response.status_code)
+                        await asyncio.sleep(1.5)
             return gen
         except AIServiceError as exc:
             status = exc.code
@@ -216,12 +226,16 @@ class GemmaClient:
         usage = data.get("usage") or {}
         return Generation(text, self.s.gemma_model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
 
-    async def _generate_google(self, prompt: str, max_tokens: int, temperature: float) -> Generation:
+    async def _generate_google(self, prompt: str, max_tokens: int, json_output: bool, temperature: float) -> Generation:
         name = self.s.gemma_model if self.s.gemma_model.startswith("models/") else f"models/{self.s.gemma_model}"
-        body = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
-        }
+        config: dict[str, Any] = {"temperature": temperature, "maxOutputTokens": max_tokens}
+        if json_output and self.s.gemma_json_mode:
+            config["responseMimeType"] = "application/json"
+        if self.s.gemma_disable_thinking:
+            # Verified for gemma-4-26b-a4b-it / gemma-4-31b-it: "minimal" is accepted and yields no
+            # thought tokens; thinkingBudget and other levels are rejected with HTTP 400.
+            config["thinkingConfig"] = {"thinkingLevel": "minimal"}
+        body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": config}
         r = await self._client().post(
             f"{GOOGLE_API_ROOT}/{name}:generateContent",
             headers={"x-goog-api-key": self.s.gemma_api_key, "Content-Type": "application/json"},
@@ -288,7 +302,7 @@ class GemmaAudioClient:
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(timeout=httpx.Timeout(self.s.gemma_timeout_seconds, connect=10.0))
+            self._http = async_client(self.s.gemma_timeout_seconds)
         return self._http
 
     async def aclose(self) -> None:

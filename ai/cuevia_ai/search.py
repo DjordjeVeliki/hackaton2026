@@ -20,6 +20,8 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from .net import async_client
+
 log = logging.getLogger("cuevia_ai.search")
 
 BRAVE_WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
@@ -94,7 +96,7 @@ class BraveSearch:
 
     def _client(self) -> httpx.AsyncClient:
         if self._http is None:
-            self._http = httpx.AsyncClient(timeout=self.timeout, follow_redirects=False)
+            self._http = async_client(self.timeout)
         return self._http
 
     async def aclose(self) -> None:
