@@ -29,7 +29,11 @@ class Settings(BaseSettings):
     chunk_seconds: int = 5
     # Allowed clock skew between client recording offsets and server time.
     clock_skew_ms: int = 15000
-    rate_limit_per_minute: int = 120
+    # Attendees poll the live transcript every second (~80 requests/min during a talk).
+    rate_limit_per_minute: int = 300
+    # TESTING ONLY: when a talk's speaker starts transcription, delete the talk's previous recordings
+    # and transcript text so every test run starts clean. Never enable for a real event.
+    reset_transcript_on_start: bool = False
 
     # Deterministic policy (prototype gate)
     policy_version: str = "policy-v1"

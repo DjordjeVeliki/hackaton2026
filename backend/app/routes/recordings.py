@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import time
 import uuid
 from datetime import timedelta
@@ -18,6 +19,7 @@ from ..schemas import (CatchUp, CatchUpRequest, ChunkAccepted, Explanation, Expl
 from .events import private_profile_ref
 
 router = APIRouter()
+log = logging.getLogger("cuevia.recordings")
 
 AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/wav", "audio/x-wav", "audio/wave", "audio/mp4", "audio/mpeg"}
 MAX_CATCH_UP_MS = 10 * 60 * 1000
@@ -100,6 +102,28 @@ def is_trusted_source(talk: dict, uid: str) -> bool:
     return uid in talk.get("speaker_uids", []) or uid in event.get("organizer_uids", [])
 
 
+def reset_talk_transcripts(talk_id: str, keep: str | None = None) -> int:
+    """TESTING ONLY (RESET_TRANSCRIPT_ON_START): delete every earlier recording of the talk with its
+    transcript text and any stored audio, and forget in-memory live text / read grants for them."""
+    removed = 0
+    for snap in firebase.db().collection("recordings").where("talk_id", "==", talk_id).stream():
+        if snap.id == keep:
+            continue
+        for c in snap.reference.collection("chunks").stream():
+            blob = (c.to_dict() or {}).get("blob")
+            if blob:  # audio not yet transcribed
+                blobs.delete(blob)
+            c.reference.delete()
+        snap.reference.delete()
+        _live_text.pop(snap.id, None)
+        _live_publishers.pop(snap.id, None)
+        for key in [k for k in _read_grants if k[0] == snap.id]:
+            _read_grants.pop(key, None)
+        removed += 1
+    log.info("reset_transcript_on_start talk=%s removed_recordings=%d", talk_id, removed)
+    return removed
+
+
 @router.post("/talks/{talk_id}/recordings", response_model=RecordingStarted)
 def start_recording(talk_id: str, user: User = Depends(current_user)):
     talk = get_talk(talk_id)
@@ -110,6 +134,8 @@ def start_recording(talk_id: str, user: User = Depends(current_user)):
     rec_ref(rid).set({"talk_id": talk_id, "event_id": talk["event_id"], "owner_uid": user.uid, "mode": "live",
                       "status": "active", "started_at": started, "sample_rate_hz": s.sample_rate_hz,
                       "chunk_seconds": s.chunk_seconds})
+    if user.uid in talk.get("speaker_uids", []) and s.reset_transcript_on_start:
+        reset_talk_transcripts(talk_id, keep=rid)
     if user.uid in talk.get("speaker_uids", []):
         # v1.1: the talk's own speaker starting transcription makes it the authoritative source and the talk live.
         update = {"transcript_source": {"recording_id": rid, "configured_by": user.uid, "configured_at": started}}
