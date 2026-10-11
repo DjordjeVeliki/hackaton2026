@@ -9,12 +9,12 @@ const MAX_BYTES = 10 * 1024 * 1024
 const ACCEPT = '.pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain'
 
 export const CV_LABEL: Record<CvStatus, { text: string; tone: 'slate' | 'amber' | 'green' | 'red' }> = {
-  missing: { text: 'CV nije otpremljen', tone: 'slate' },
-  uploaded: { text: 'CV otpremljen', tone: 'amber' },
-  processing: { text: 'CV se obrađuje…', tone: 'amber' },
-  parsed: { text: 'CV obrađen', tone: 'green' },
-  failed: { text: 'Obrada CV-a nije uspela', tone: 'red' },
-  removed: { text: 'CV uklonjen', tone: 'slate' },
+  missing: { text: 'No CV uploaded', tone: 'slate' },
+  uploaded: { text: 'CV uploaded', tone: 'amber' },
+  processing: { text: 'Processing CV…', tone: 'amber' },
+  parsed: { text: 'CV processed', tone: 'green' },
+  failed: { text: 'CV processing failed', tone: 'red' },
+  removed: { text: 'CV removed', tone: 'slate' },
 }
 
 /** CV status + eligibility. Deliberately no numeric expertise, rating or rank. */
@@ -29,22 +29,22 @@ export function ProfileStatus({ profile }: { profile: ProfilePublic }) {
         </dd>
       </div>
       <div>
-        <dt className="text-slate-600">Stručnost</dt>
+        <dt className="text-slate-600">Expertise</dt>
         <dd>
           {profile.expertise_status === 'N/A' ? (
-            <Badge>N/A — nema obrađenog CV-a</Badge>
+            <Badge>N/A — no processed CV</Badge>
           ) : (
-            <Badge tone="blue">Procenjena (savetodavno)</Badge>
+            <Badge tone="blue">Estimated (advisory)</Badge>
           )}
         </dd>
       </div>
       <div>
-        <dt className="text-slate-600">Preporuke sponzorima</dt>
+        <dt className="text-slate-600">Sponsor recommendations</dt>
         <dd>
           {profile.eligible_for_top5 ? (
-            <Badge tone="green">Možete biti predloženi (uz vašu saglasnost)</Badge>
+            <Badge tone="green">You can be recommended (with your consent)</Badge>
           ) : (
-            <Badge>Niste u izboru za preporuke</Badge>
+            <Badge>Not eligible for recommendations</Badge>
           )}
         </dd>
       </div>
@@ -75,7 +75,7 @@ export function CvPanel({ eventId, profile }: { eventId: string; profile: Profil
   const onFile = (file: File | undefined) => {
     setLocalError(null)
     if (!file) return
-    if (file.size > MAX_BYTES) return setLocalError('Fajl je veći od 10 MB.')
+    if (file.size > MAX_BYTES) return setLocalError('The file is larger than 10 MB.')
     upload.mutate(file)
   }
 
@@ -88,13 +88,12 @@ export function CvPanel({ eventId, profile }: { eventId: string; profile: Profil
       <ProfileStatus profile={profile} />
       {busy && (
         <p role="status" className="text-sm text-slate-700">
-          {upload.isPending ? 'Otpremanje…' : 'CV se obrađuje. Možete nastaviti da koristite aplikaciju.'}
+          {upload.isPending ? 'Uploading…' : 'Your CV is being processed. You can keep using the app.'}
         </p>
       )}
       {s === 'failed' && (
         <Notice tone="warn">
-          CV nije moguće obraditi. Stručnost ostaje N/A i niste u izboru za preporuke, ali sve funkcije praćenja predavanja i dalje rade.
-          Pokušajte drugi fajl (PDF, DOCX ili TXT).
+          We couldn’t process this CV. Expertise stays N/A and you are not eligible for recommendations, but all talk features still work. Try another file (PDF, DOCX or TXT).
         </Notice>
       )}
       <div className="flex flex-wrap items-center gap-2">
@@ -120,17 +119,16 @@ export function CvPanel({ eventId, profile }: { eventId: string; profile: Profil
           role="button"
           aria-disabled={busy}
         >
-          {hasCv ? 'Otpremi novi CV' : 'Otpremi CV'}
+          {hasCv ? 'Upload a new CV' : 'Upload CV'}
         </label>
         {hasCv && (
           <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending || upload.isPending}>
-            {remove.isPending ? 'Uklanjanje…' : 'Ukloni CV'}
+            {remove.isPending ? 'Removing…' : 'Remove CV'}
           </Button>
         )}
       </div>
       <p className="text-xs text-slate-600">
-        PDF, DOCX ili TXT, do 10 MB. Procena iz CV-a je savetodavna i ne predstavlja proveru znanja niti odluku o zapošljavanju.
-        Sponzori vide CV samo ako im to izričito dozvolite.
+        PDF, DOCX or TXT, up to 10 MB. The CV-based estimate is advisory; it is not a knowledge test or a hiring decision. Sponsors see your CV only if you explicitly allow it.
       </p>
       {localError && (
         <p role="alert" className="text-sm text-red-700">

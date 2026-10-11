@@ -13,10 +13,9 @@ export function CvOnboardingPage() {
   if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <h1 className="text-2xl font-bold">Želite li da dodate CV?</h1>
+      <h1 className="text-2xl font-bold">Would you like to add your CV?</h1>
       <p className="text-slate-700">
-        CV je opcion. Bez njega i dalje imate transkript, „Izgubio sam nit", objašnjenja pojmova i pitanja govorniku. CV vam samo
-        omogućava da, uz vašu saglasnost, budete predloženi sponzorima.
+        Your CV is optional. Without it you still get the transcript, “I lost the thread”, term explanations and questions to the speaker. A CV only lets you be recommended to sponsors, with your consent.
       </p>
       <Card>
         {profile.isPending && <Spinner />}
@@ -28,7 +27,7 @@ export function CvOnboardingPage() {
           to={`/events/${eventId}`}
           className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 font-medium hover:bg-slate-50"
         >
-          {profile.data?.cv_status === 'missing' ? 'Preskoči za sada' : 'Nastavi na predavanja'}
+          {profile.data?.cv_status === 'missing' ? 'Skip for now' : 'Continue to talks'}
         </Link>
       </div>
     </div>

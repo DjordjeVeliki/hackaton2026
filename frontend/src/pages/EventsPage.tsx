@@ -24,10 +24,10 @@ export function EventsPage() {
   const items = events.data?.pages.flatMap((p) => p.items) ?? []
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Događaji</h1>
+      <h1 className="text-2xl font-bold">Events</h1>
       {events.isPending && <Spinner />}
       {events.isError && <ErrorAlert error={events.error} onRetry={() => events.refetch()} />}
-      {events.isSuccess && items.length === 0 && <EmptyState>Trenutno nema dostupnih događaja.</EmptyState>}
+      {events.isSuccess && items.length === 0 && <EmptyState>No events available right now.</EmptyState>}
       <ul className="space-y-3">
         {items.map((e) => (
           <li key={e.id}>
@@ -36,10 +36,10 @@ export function EventsPage() {
                 <h2 className="text-lg font-semibold">{e.title}</h2>
                 <div className="flex gap-2">
                   <Button variant="secondary" onClick={() => nav(`/events/${e.id}`)}>
-                    Otvori
+                    Open
                   </Button>
                   <Button onClick={() => join.mutate(e.id)} disabled={join.isPending && join.variables === e.id}>
-                    {join.isPending && join.variables === e.id ? 'Pridruživanje…' : 'Pridruži se'}
+                    {join.isPending && join.variables === e.id ? 'Joining…' : 'Join'}
                   </Button>
                 </div>
               </div>
@@ -50,7 +50,7 @@ export function EventsPage() {
       {join.isError && <ErrorAlert error={join.error} />}
       {events.hasNextPage && (
         <Button variant="secondary" onClick={() => events.fetchNextPage()} disabled={events.isFetchingNextPage}>
-          Učitaj još
+          Load more
         </Button>
       )}
     </div>

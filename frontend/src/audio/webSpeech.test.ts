@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { WebSpeechTranscriber, type SpeechRecognitionLike, type SpeechResultEvent } from './webSpeech'
 
 class FakeRecognition implements SpeechRecognitionLike {
@@ -24,6 +24,15 @@ class FakeRecognition implements SpeechRecognitionLike {
   abort() {
     this.stop()
   }
+  /** Chrome-on-Android style: every growing version arrives as a new final result. */
+  emitCumulativeFinals(phrase: string) {
+    const ws = phrase.split(' ')
+    const results: Array<[string, boolean]> = []
+    for (let n = 1; n <= ws.length; n++) {
+      results.push([ws.slice(0, n).join(' '), true])
+      this.emit(results, results.length - 1)
+    }
+  }
   emit(results: Array<[string, boolean]>, resultIndex = 0) {
     const list = results.map(([text, isFinal]) => Object.assign([{ transcript: text }], { isFinal }))
     this.onresult?.({ resultIndex, results: list as unknown as SpeechResultEvent['results'] })
@@ -33,7 +42,7 @@ class FakeRecognition implements SpeechRecognitionLike {
 function setup() {
   FakeRecognition.instances = []
   let clock = 0
-  const t = new WebSpeechTranscriber({ ctor: FakeRecognition, now: () => clock })
+  const t = new WebSpeechTranscriber({ ctor: FakeRecognition, now: () => clock, settleMs: 5 })
   return { t, tick: (ms: number) => (clock += ms), rec: () => FakeRecognition.instances.at(-1)! }
 }
 
@@ -52,7 +61,7 @@ describe('WebSpeechTranscriber', () => {
     expect(t.getSnapshot().status).toBe('listening')
   })
 
-  it('turns final results into timed contract-shaped segments and shows interim text', () => {
+  it('turns final results into timed contract-shaped segments and shows interim text', async () => {
     const { t, tick, rec } = setup()
     t.start()
     tick(1000)
@@ -61,10 +70,12 @@ describe('WebSpeechTranscriber', () => {
     expect(t.getSnapshot().segments).toEqual([])
     tick(2000)
     rec().emit([['Dobro veče svima', true]])
-    expect(t.getSnapshot().interim).toBe('')
-    expect(t.getSnapshot().segments).toEqual([
-      { id: 'ws-0', sequence: 0, start_ms: 1000, end_ms: 3000, text: 'Dobro veče svima', status: 'ready' },
-    ])
+    // Held briefly in case the browser extends the same utterance, then published once.
+    await vi.waitFor(() =>
+      expect(t.getSnapshot().segments).toEqual([
+        { id: 'ws-0', sequence: 0, start_ms: 1000, end_ms: 3000, text: 'Dobro veče svima', status: 'ready' },
+      ]),
+    )
   })
 
   it('restarts automatically when the browser ends the session', () => {
@@ -95,6 +106,8 @@ describe('WebSpeechTranscriber', () => {
     t.stop()
     t.start()
     rec().emit([['drugi', true]])
+    t.stop()
+    t.start()
     expect(t.getSnapshot().segments.map((s) => s.id)).toEqual(['ws-0', 'ws-1'])
     t.stop()
     t.reset()
@@ -108,7 +121,7 @@ describe('WebSpeechTranscriber', () => {
     rec().onend?.()
     expect(FakeRecognition.instances).toHaveLength(1)
     expect(t.getSnapshot().status).toBe('error')
-    expect(t.getSnapshot().error).toMatch(/odbijen/)
+    expect(t.getSnapshot().error).toMatch(/denied/)
   })
 
   it('ignores no-speech and keeps listening', () => {
@@ -117,5 +130,37 @@ describe('WebSpeechTranscriber', () => {
     rec().onerror?.({ error: 'no-speech' })
     rec().onend?.()
     expect(t.getSnapshot()).toMatchObject({ status: 'listening', error: null })
+  })
+
+  it('Android cumulative finals become ONE segment, not one per word', async () => {
+    const { t, rec } = setup()
+    const published: string[] = []
+    t.onSegment((s) => published.push(s.text))
+    t.start('en-US')
+    rec().emitCumulativeFinals("okay so I'm speaking at about")
+    rec().emit([["okay so I'm speaking at about", true]], 0) // re-sent old final
+    await vi.waitFor(() => expect(published).toEqual(["okay so I'm speaking at about"]))
+    expect(t.getSnapshot().segments).toHaveLength(1)
+  })
+
+  it('distinct utterances are still separate segments', async () => {
+    const { t, rec } = setup()
+    const published: string[] = []
+    t.onSegment((s) => published.push(s.text))
+    t.start()
+    rec().emitCumulativeFinals('first sentence here')
+    rec().emitCumulativeFinals('second one')
+    await vi.waitFor(() => expect(published).toEqual(['first sentence here', 'second one']))
+  })
+
+  it('a late extension after publishing only adds the new words', async () => {
+    const { t, rec } = setup()
+    const published: string[] = []
+    t.onSegment((s) => published.push(s.text))
+    t.start()
+    rec().emit([['we use vector indexes', true]])
+    await vi.waitFor(() => expect(published).toEqual(['we use vector indexes']))
+    rec().emit([['we use vector indexes', true], ['we use vector indexes for search', true]], 1)
+    await vi.waitFor(() => expect(published).toEqual(['we use vector indexes', 'for search']))
   })
 })

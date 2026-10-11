@@ -92,7 +92,7 @@ export class UploadQueue {
           this.update({ sent: this.state.sent + 1, lastError: null })
           break
         } catch (e) {
-          const msg = e instanceof Error ? e.message : 'Slanje nije uspelo'
+          const msg = e instanceof Error ? e.message : 'Sending failed'
           if (this.closed || !this.isRetryable(e) || attempt >= this.maxAttempts) {
             this.update({ dropped: this.state.dropped + 1, lastError: msg })
             break

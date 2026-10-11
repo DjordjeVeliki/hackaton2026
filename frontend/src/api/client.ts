@@ -66,7 +66,7 @@ export class ApiClient {
 
   private async send(method: string, path: string, opts: RequestOpts, forceRefresh: boolean): Promise<Response> {
     const token = await this.tokens.getIdToken(forceRefresh)
-    if (!token) throw new ApiError(401, 'UNAUTHENTICATED', 'Niste prijavljeni.', null)
+    if (!token) throw new ApiError(401, 'UNAUTHENTICATED', 'You are not signed in.', null)
     const headers: Record<string, string> = { Authorization: `Bearer ${token}`, Accept: 'application/json' }
     let body: BodyInit | undefined
     if (opts.form) body = opts.form
@@ -78,7 +78,7 @@ export class ApiClient {
       return await this.fetchImpl(this.baseUrl + path, { method, headers, body, signal: opts.signal })
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') throw e
-      throw new ApiError(0, 'NETWORK_ERROR', 'Nema veze sa serverom.', null)
+      throw new ApiError(0, 'NETWORK_ERROR', 'Cannot reach the server.', null)
     }
   }
 
@@ -165,7 +165,7 @@ export class ApiClient {
   finalizeShortlists = (eventId: string) =>
     this.json('POST', `/organizer/events/${enc(eventId)}/finalize-shortlists`, (v) => {
       const o = v as { snapshot_id?: unknown; status?: unknown }
-      if (typeof o?.snapshot_id !== 'string') throw new s.ContractError('snapshot_id nedostaje')
+      if (typeof o?.snapshot_id !== 'string') throw new s.ContractError('snapshot_id is missing')
       return { snapshot_id: o.snapshot_id, status: 'finalized' as const }
     })
   metrics = (eventId: string) => this.json('GET', `/organizer/events/${enc(eventId)}/metrics`, s.metrics)
@@ -173,7 +173,7 @@ export class ApiClient {
 
 async function toApiError(res: Response): Promise<ApiError> {
   let code = `HTTP_${res.status}`
-  let message = `Greška servera (${res.status}).`
+  let message = `Server error (${res.status}).`
   let requestId: string | null = null
   try {
     const body = (await res.json()) as { error?: { code?: unknown; message?: unknown; request_id?: unknown } }

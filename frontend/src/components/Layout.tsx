@@ -27,11 +27,11 @@ export function Layout() {
 
   const tabs: Tab[] = eventId
     ? [
-        { to: `/events/${eventId}`, label: 'Predavanja', icon: '🎤', end: true },
-        ...(hasRole(roles, 'speaker') ? [{ to: `/speaker/events/${eventId}`, label: 'Pitanja', icon: '💬' }] : []),
-        ...(hasRole(roles, 'sponsor') ? [{ to: `/sponsor/events/${eventId}`, label: 'Sponzor', icon: '🤝' }] : []),
-        ...(hasRole(roles, 'organizer') ? [{ to: `/organizer/events/${eventId}`, label: 'Organizator', icon: '📊' }] : []),
-        ...(hasRole(roles, 'speaker') ? [] : [{ to: `/events/${eventId}/profile`, label: 'Profil', icon: '👤' }]),
+        { to: `/events/${eventId}`, label: 'Talks', icon: '🎤', end: true },
+        ...(hasRole(roles, 'speaker') ? [{ to: `/speaker/events/${eventId}`, label: 'Questions', icon: '💬' }] : []),
+        ...(hasRole(roles, 'sponsor') ? [{ to: `/sponsor/events/${eventId}`, label: 'Sponsor', icon: '🤝' }] : []),
+        ...(hasRole(roles, 'organizer') ? [{ to: `/organizer/events/${eventId}`, label: 'Organizer', icon: '📊' }] : []),
+        ...(hasRole(roles, 'speaker') ? [] : [{ to: `/events/${eventId}/profile`, label: 'Profile', icon: '👤' }]),
       ]
     : []
 
@@ -50,7 +50,7 @@ export function Layout() {
         </Suspense>
       )}
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-2">
-        Preskoči na sadržaj
+        Skip to content
       </a>
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-2">
@@ -64,10 +64,10 @@ export function Layout() {
               role="status"
             >
               <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" aria-hidden />
-              Uživo
+              Live
             </Link>
           )}
-          <nav aria-label="Glavna navigacija" className="hidden flex-1 items-center gap-1 sm:flex">
+          <nav aria-label="Main navigation" className="hidden flex-1 items-center gap-1 sm:flex">
             {tabs.map((t) => (
               <NavLink key={t.to} to={t.to} end={t.end} className={topCls}>
                 {t.label}
@@ -85,7 +85,7 @@ export function Layout() {
               qc.clear()
             }}
           >
-            Odjava
+            Sign out
           </Button>
         </div>
       </header>
@@ -94,7 +94,7 @@ export function Layout() {
       </main>
       {tabs.length > 0 && (
         <nav
-          aria-label="Navigacija"
+          aria-label="Navigation"
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden"
         >
           {tabs.map((t) => (

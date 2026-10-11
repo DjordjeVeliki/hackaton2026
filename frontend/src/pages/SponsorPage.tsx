@@ -23,17 +23,17 @@ export function SponsorPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Sponzor / grupa</h1>
-      <Card title="Prilike">
+      <h1 className="text-2xl font-bold">Sponsor / group</h1>
+      <Card title="Opportunities">
         {opps.isPending && <Spinner />}
         {opps.isError && <ErrorAlert error={opps.error} onRetry={() => opps.refetch()} />}
-        {opps.data?.length === 0 && <EmptyState>Još nema prilika.</EmptyState>}
+        {opps.data?.length === 0 && <EmptyState>No opportunities yet.</EmptyState>}
         <ul className="space-y-2">
           {opps.data?.map((o) => (
             <li key={o.id} className="rounded-lg border border-slate-200 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{o.title}</span>
-                <Badge tone="blue">{o.recipient_kind === 'sponsor' ? 'Sponzor' : 'Grupa'}</Badge>
+                <Badge tone="blue">{o.recipient_kind === 'sponsor' ? 'Sponsor' : 'Group'}</Badge>
               </div>
               {o.topics.length > 0 && <p className="text-sm text-slate-600">{o.topics.join(', ')}</p>}
             </li>
@@ -42,18 +42,17 @@ export function SponsorPage() {
         <NewOpportunity eventId={eventId} />
       </Card>
 
-      <Card title="Preporučeni učesnici">
+      <Card title="Recommended attendees">
         <Notice>
-          Do pet učesnika po prilici, samo oni koji su dali saglasnost, nakon što organizator finalizuje liste. Preporuke su savetodavne — vi
-          odlučujete koga kontaktirate.
+          Up to five attendees per opportunity, only those who consented, after the organizer finalizes the lists. Recommendations are advisory — you decide whom to contact.
         </Notice>
         <div className="mt-3">
           {recs.isPending && <Spinner />}
           {recs.isError && <ErrorAlert error={recs.error} onRetry={() => recs.refetch()} />}
-          {recs.data?.length === 0 && <EmptyState>Još nema preporuka (liste možda nisu finalizovane).</EmptyState>}
+          {recs.data?.length === 0 && <EmptyState>No recommendations yet (lists may not be finalized).</EmptyState>}
         </div>
         <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <ul className="space-y-2" aria-label="Lista preporuka">
+          <ul className="space-y-2" aria-label="Recommendations">
             {recs.data?.map((r) => (
               <li key={r.participant_id}>
                 <button
@@ -96,20 +95,20 @@ function NewOpportunity({ eventId }: { eventId: string }) {
   }
   return (
     <form onSubmit={submit} className="mt-4 space-y-3 border-t border-slate-200 pt-4">
-      <h3 className="font-semibold">Nova prilika</h3>
-      <Field label="Naziv" htmlFor="opp-title">
+      <h3 className="font-semibold">New opportunity</h3>
+      <Field label="Title" htmlFor="opp-title">
         <input id="opp-title" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={120} />
       </Field>
-      <Field label="Teme" htmlFor="opp-topics" hint="Odvojene zarezom">
+      <Field label="Topics" htmlFor="opp-topics" hint="Comma-separated">
         <input id="opp-topics" className={inputClass} value={topics} onChange={(e) => setTopics(e.target.value)} />
       </Field>
-      <Field label="Potrebne veštine" htmlFor="opp-skills" hint="Odvojene zarezom">
+      <Field label="Required skills" htmlFor="opp-skills" hint="Comma-separated">
         <input id="opp-skills" className={inputClass} value={skills} onChange={(e) => setSkills(e.target.value)} />
       </Field>
       <Button type="submit" disabled={m.isPending || !title.trim()}>
-        {m.isPending ? 'Čuvanje…' : 'Objavi priliku'}
+        {m.isPending ? 'Saving…' : 'Post opportunity'}
       </Button>
-      {m.isSuccess && <p role="status" className="text-sm text-green-800">Prilika je objavljena.</p>}
+      {m.isSuccess && <p role="status" className="text-sm text-green-800">Opportunity posted.</p>}
       {m.isError && <ErrorAlert error={m.error} />}
     </form>
   )
@@ -132,7 +131,7 @@ function RecommendationDetail({ eventId, rec }: { eventId: string; rec: Recommen
     },
   })
   return (
-    <article className="space-y-3 rounded-lg border border-slate-200 p-3" aria-label={`Detalji: ${rec.display_name}`}>
+    <article className="space-y-3 rounded-lg border border-slate-200 p-3" aria-label={`Details: ${rec.display_name}`}>
       <h3 className="text-lg font-semibold">{rec.display_name}</h3>
       {rec.interests.length > 0 && (
         <ul className="flex flex-wrap gap-1">
@@ -145,7 +144,7 @@ function RecommendationDetail({ eventId, rec }: { eventId: string; rec: Recommen
       )}
       {rec.reasons.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium">Zašto je predložen/a</h4>
+          <h4 className="text-sm font-medium">Why recommended</h4>
           <ul className="list-disc pl-5 text-sm">
             {rec.reasons.map((r, i) => (
               <li key={i}>{r}</li>
@@ -154,9 +153,9 @@ function RecommendationDetail({ eventId, rec }: { eventId: string; rec: Recommen
         </div>
       )}
       <div>
-        <h4 className="text-sm font-medium">Podeljena pitanja</h4>
+        <h4 className="text-sm font-medium">Shared questions</h4>
         {rec.questions.length === 0 ? (
-          <p className="text-sm text-slate-600">Učesnik nije podelio pitanja.</p>
+          <p className="text-sm text-slate-600">The attendee has not shared questions.</p>
         ) : (
           <ul className="space-y-2">
             {rec.questions.map((q) => (
@@ -170,10 +169,10 @@ function RecommendationDetail({ eventId, rec }: { eventId: string; rec: Recommen
       </div>
       {rec.cv_available ? (
         <Button variant="secondary" onClick={() => download.mutate()} disabled={download.isPending}>
-          {download.isPending ? 'Preuzimanje…' : 'Preuzmi CV'}
+          {download.isPending ? 'Downloading…' : 'Download CV'}
         </Button>
       ) : (
-        <p className="text-sm text-slate-600">CV nije podeljen sa vama.</p>
+        <p className="text-sm text-slate-600">The CV is not shared with you.</p>
       )}
       {download.isError && <ErrorAlert error={download.error} />}
     </article>

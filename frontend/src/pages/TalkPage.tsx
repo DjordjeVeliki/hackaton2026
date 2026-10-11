@@ -44,10 +44,10 @@ export function TalkPage() {
     <div className="space-y-3">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl leading-tight font-bold sm:text-2xl">{talk?.title ?? 'Predavanje'}</h1>
+          <h1 className="text-xl leading-tight font-bold sm:text-2xl">{talk?.title ?? 'Talk'}</h1>
           {talk && <p className="truncate text-slate-600">{talk.speaker_name}</p>}
         </div>
-        {live ? <Badge tone="red">● Uživo</Badge> : talk?.status === 'ended' ? <Badge>Završeno</Badge> : null}
+        {live ? <Badge tone="red">● Live</Badge> : talk?.status === 'ended' ? <Badge>Ended</Badge> : null}
       </header>
       {talks.isError && <ErrorAlert error={talks.error} onRetry={() => talks.refetch()} />}
 
@@ -56,10 +56,10 @@ export function TalkPage() {
       {recordingId && (
         <div className="grid grid-cols-2 gap-2">
           <Button className="min-h-12" variant="secondary" onClick={() => setCatchUpOpen(true)}>
-            🧭 Izgubio sam nit
+            🧭 I lost the thread
           </Button>
           <Button className="min-h-12" variant="secondary" onClick={() => setExplain({ term: '', segmentId: lastReady?.id ?? null })}>
-            Objasni pojam
+            Explain a term
           </Button>
         </div>
       )}
@@ -73,8 +73,8 @@ export function TalkPage() {
         source.isSuccess && (
           <Notice>
             {isSpeaker
-              ? 'Pokrenite transkripciju kada počnete predavanje — publika će tekst videti uživo na svojim telefonima.'
-              : 'Transkript će se pojaviti automatski čim govornik započne predavanje. Pitanje govorniku možete postaviti već sada.'}
+              ? 'Start transcription when you begin your talk — the audience will see the text live on their phones.'
+              : 'The transcript will appear automatically as soon as the speaker starts. You can already ask the speaker a question.'}
           </Notice>
         )
       )}
@@ -89,7 +89,7 @@ export function TalkPage() {
               setSelection(null)
             }}
           >
-            <span className="truncate">Objasni: „{selection.text}"</span>
+            <span className="truncate">Explain: “{selection.text}"</span>
           </Button>
         </div>
       )}

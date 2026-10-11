@@ -24,16 +24,15 @@ export function OrganizerPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Organizator</h1>
+      <h1 className="text-2xl font-bold">Organizer</h1>
 
-      <Card title="Predavanja i zvanični izvor transkripta">
+      <Card title="Talks and official transcript source">
         <p className="mb-3 text-sm text-slate-700">
-          Zvanični izvor je snimak koji backend koristi kao merodavan transkript (npr. za kontekst pitanja). Pokrenite snimanje na
-          uređaju kod govornika i označite ga na stranici predavanja, ili unesite ID snimka ovde.
+          The official source is the recording the backend uses as the authoritative transcript (e.g. for question context). It is set automatically when the speaker starts transcription; you can override it here with a recording ID.
         </p>
         {talks.isPending && <Spinner />}
         {talks.isError && <ErrorAlert error={talks.error} onRetry={() => talks.refetch()} />}
-        {talks.data?.length === 0 && <EmptyState>Nema predavanja.</EmptyState>}
+        {talks.data?.length === 0 && <EmptyState>No talks.</EmptyState>}
         <ul className="space-y-3">
           {talks.data?.map((t) => (
             <li key={t.id}>
@@ -43,26 +42,26 @@ export function OrganizerPage() {
         </ul>
       </Card>
 
-      <Card title="Finalizacija preporuka">
+      <Card title="Finalize recommendations">
         <p className="mb-3 text-sm text-slate-700">
-          Zamrzava liste do pet preporučenih učesnika po prilici. Sponzori nakon toga vide samo profile sa saglasnošću.
+          Freezes lists of up to five recommended attendees per opportunity. Sponsors then see only consenting profiles.
         </p>
         {finalize.isSuccess ? (
           <Notice tone="success">
-            Liste su finalizovane. Snapshot: <code>{finalize.data.snapshot_id}</code>
+            Lists finalized. Snapshot: <code>{finalize.data.snapshot_id}</code>
           </Notice>
         ) : confirming ? (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">Sigurno finalizovati?</span>
+            <span className="text-sm font-medium">Finalize now?</span>
             <Button onClick={() => finalize.mutate()} disabled={finalize.isPending}>
-              {finalize.isPending ? 'Finalizujem…' : 'Da, finalizuj'}
+              {finalize.isPending ? 'Finalizing…' : 'Yes, finalize'}
             </Button>
             <Button variant="secondary" onClick={() => setConfirming(false)} disabled={finalize.isPending}>
-              Odustani
+              Cancel
             </Button>
           </div>
         ) : (
-          <Button onClick={() => setConfirming(true)}>Finalizuj liste</Button>
+          <Button onClick={() => setConfirming(true)}>Finalize lists</Button>
         )}
         {finalize.isError && (
           <div className="mt-2">
@@ -71,7 +70,7 @@ export function OrganizerPage() {
         )}
       </Card>
 
-      <Card title="Metrike događaja">
+      <Card title="Event metrics">
         {metrics.isPending && <Spinner />}
         {metrics.isError && <ErrorAlert error={metrics.error} onRetry={() => metrics.refetch()} />}
         {metrics.data && <MetricsView m={metrics.data} />}
@@ -96,25 +95,25 @@ function TranscriptSourceRow({ talk }: { talk: Talk }) {
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-medium">{talk.title}</span>
         <span className="text-sm text-slate-600">{talk.speaker_name}</span>
-        {m.isSuccess && <Badge tone="green">Izvor podešen</Badge>}
+        {m.isSuccess && <Badge tone="green">Source set</Badge>}
       </div>
       <form onSubmit={submit} className="flex flex-wrap gap-2">
         <label htmlFor={inputId} className="sr-only">
-          ID snimka za {talk.title}
+          Recording ID for {talk.title}
         </label>
         <input
           id={inputId}
           className={`${inputClass} min-w-0 flex-1`}
-          placeholder="ID snimka"
+          placeholder="Recording ID"
           value={rid}
           onChange={(e) => setRid(e.target.value)}
         />
         <Button type="submit" size="sm" variant="secondary" disabled={m.isPending || !rid.trim()}>
-          Postavi
+          Set
         </Button>
         {ownRecording && (
           <Button size="sm" variant="ghost" onClick={() => m.mutate(ownRecording)} disabled={m.isPending}>
-            Koristi moj trenutni snimak
+            Use my current recording
           </Button>
         )}
       </form>
@@ -129,12 +128,12 @@ function TranscriptSourceRow({ talk }: { talk: Talk }) {
 
 function MetricsView({ m }: { m: Metrics }) {
   const tiles: [string, number][] = [
-    ['Učesnici', m.attendee_count],
-    ['Obrađeni CV-ovi', m.cv_parsed_count],
-    ['Bez CV-a (N/A)', m.na_count],
-    ['Pitanja', m.question_count],
-    ['„Izgubio sam nit"', m.catch_up_count],
-    ['Deljenja sa sponzorima', m.share_count],
+    ['Attendees', m.attendee_count],
+    ['Processed CVs', m.cv_parsed_count],
+    ['Without CV (N/A)', m.na_count],
+    ['Questions', m.question_count],
+    ['“I lost the thread”', m.catch_up_count],
+    ['Shares with sponsors', m.share_count],
   ]
   return (
     <div className="space-y-6">
@@ -142,12 +141,12 @@ function MetricsView({ m }: { m: Metrics }) {
         {tiles.map(([label, value]) => (
           <div key={label} className="rounded-lg bg-slate-50 p-3">
             <dt className="text-sm text-slate-600">{label}</dt>
-            <dd className="text-2xl font-semibold tabular-nums">{value.toLocaleString('sr-Latn')}</dd>
+            <dd className="text-2xl font-semibold tabular-nums">{value.toLocaleString('en')}</dd>
           </div>
         ))}
       </dl>
-      <CountChart title="Najtraženiji pojmovi" rows={m.requested_terms.map((t) => ({ label: t.term, count: t.count }))} empty="Još nema traženih objašnjenja." />
-      <CountChart title="Raspodela interesovanja" rows={m.interest_distribution.map((t) => ({ label: t.topic, count: t.count }))} empty="Još nema interesovanja." />
+      <CountChart title="Most requested terms" rows={m.requested_terms.map((t) => ({ label: t.term, count: t.count }))} empty="No explanations requested yet." />
+      <CountChart title="Interest distribution" rows={m.interest_distribution.map((t) => ({ label: t.topic, count: t.count }))} empty="No interests yet." />
     </div>
   )
 }
@@ -168,18 +167,18 @@ function CountChart({ title, rows, empty }: { title: string; rows: { label: stri
                 <CartesianGrid horizontal={false} stroke="#e2e8f0" />
                 <XAxis type="number" allowDecimals={false} tick={{ fill: '#475569', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="label" width={120} tick={{ fill: '#334155', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [v as number, 'Broj']} isAnimationActive={false} />
+                <Tooltip cursor={{ fill: '#f1f5f9' }} formatter={(v) => [v as number, 'Count']} isAnimationActive={false} />
                 <Bar dataKey="count" fill="#1d5fd6" radius={[0, 4, 4, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
           <details className="mt-2 text-sm">
-            <summary className="cursor-pointer text-brand-700">Prikaži kao tabelu</summary>
+            <summary className="cursor-pointer text-brand-700">Show as table</summary>
             <table className="mt-2 w-full text-left">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="py-1">Stavka</th>
-                  <th className="py-1 text-right">Broj</th>
+                  <th className="py-1">Item</th>
+                  <th className="py-1 text-right">Count</th>
                 </tr>
               </thead>
               <tbody>

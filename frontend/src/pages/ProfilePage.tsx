@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { hasRole, qk, useMe, useProfile } from '../api/hooks'
 import type { Consent, InterestSource, Opportunity, ProfilePublic } from '../api/types'
+import { Combobox } from '../components/Combobox'
 import { CvPanel } from '../components/CvPanel'
-import { Badge, Button, Card, EmptyState, ErrorAlert, Field, inputClass, Notice, Spinner } from '../components/ui'
+import { Badge, Button, Card, EmptyState, ErrorAlert, Notice, Spinner } from '../components/ui'
 import { useApi } from '../services'
 
-const SOURCE_LABEL: Record<InterestSource, string> = { cv: 'iz CV-a', question: 'iz pitanja', declared: 'uneli ste' }
+const SOURCE_LABEL: Record<InterestSource, string> = { cv: 'from CV', question: 'from questions', declared: 'added by you' }
 
 export function ProfilePage() {
   const { eventId = '' } = useParams()
@@ -18,7 +19,7 @@ export function ProfilePage() {
   if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Profil</h1>
+      <h1 className="text-2xl font-bold">Profile</h1>
       {profile.isPending && <Spinner />}
       {profile.isError && <ErrorAlert error={profile.error} onRetry={() => profile.refetch()} />}
       {profile.data && (
@@ -26,10 +27,10 @@ export function ProfilePage() {
           <Card title="CV">
             <CvPanel eventId={eventId} profile={profile.data} />
           </Card>
-          <Card title="Interesovanja">
+          <Card title="Interests">
             <Interests eventId={eventId} profile={profile.data} />
           </Card>
-          <Card title="Deljenje sa sponzorima i grupama">
+          <Card title="Sharing with sponsors and groups">
             <ConsentPanel eventId={eventId} />
           </Card>
         </>
@@ -41,28 +42,27 @@ export function ProfilePage() {
 function Interests({ eventId, profile }: { eventId: string; profile: ProfilePublic }) {
   const api = useApi()
   const qc = useQueryClient()
-  const [draft, setDraft] = useState('')
   const declared = profile.interests.filter((i) => i.source === 'declared').map((i) => i.topic)
   const save = useMutation({
     mutationFn: (list: string[]) => api.setDeclaredInterests(eventId, list),
     onSuccess: (p) => qc.setQueryData(qk.profile(eventId), p),
   })
-  const add = (e: FormEvent) => {
-    e.preventDefault()
-    const t = draft.trim()
-    if (!t || declared.some((d) => d.toLowerCase() === t.toLowerCase())) return setDraft('')
-    save.mutate([...declared, t], { onSuccess: () => setDraft('') })
+  const add = (topic: string) => {
+    if (declared.some((d) => d.toLowerCase() === topic.toLowerCase())) return
+    save.mutate([...declared, topic])
   }
   const derived = profile.interests.filter((i) => i.source !== 'declared')
+  // Suggestions: topics found in your CV first, then topics from your questions.
+  const suggestions = [...derived.filter((i) => i.source === 'cv'), ...derived.filter((i) => i.source === 'question')].map((i) => i.topic)
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-700">
-        Teme izvedene iz vašeg CV-a i pitanja, plus teme koje sami unesete. Ne prikazujemo ocene niti rang.
+        Topics derived from your CV and questions, plus topics you add yourself. We never show scores or rankings.
       </p>
-      {profile.interests.length === 0 && <EmptyState>Još nema interesovanja.</EmptyState>}
+      {profile.interests.length === 0 && <EmptyState>No interests yet.</EmptyState>}
       {derived.length > 0 && (
-        <ul className="flex flex-wrap gap-2" aria-label="Izvedena interesovanja">
+        <ul className="flex flex-wrap gap-2" aria-label="Derived interests">
           {derived.map((i) => (
             <li key={`${i.source}:${i.topic}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm">
               {i.topic} <span className="text-xs text-slate-600">· {SOURCE_LABEL[i.source]}</span>
@@ -71,14 +71,14 @@ function Interests({ eventId, profile }: { eventId: string; profile: ProfilePubl
         </ul>
       )}
       {declared.length > 0 && (
-        <ul className="flex flex-wrap gap-2" aria-label="Vaša interesovanja">
+        <ul className="flex flex-wrap gap-2" aria-label="Your interests">
           {declared.map((t) => (
             <li key={t} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-1 pr-1 pl-3 text-sm text-brand-900">
               {t}
               <button
                 type="button"
-                className="rounded-full px-2 hover:bg-brand-100"
-                aria-label={`Ukloni interesovanje ${t}`}
+                className="min-h-8 min-w-8 rounded-full px-2 hover:bg-brand-100"
+                aria-label={`Remove interest ${t}`}
                 disabled={save.isPending}
                 onClick={() => save.mutate(declared.filter((d) => d !== t))}
               >
@@ -88,16 +88,13 @@ function Interests({ eventId, profile }: { eventId: string; profile: ProfilePubl
           ))}
         </ul>
       )}
-      <form onSubmit={add} className="flex gap-2">
-        <div className="flex-1">
-          <Field label="Dodaj interesovanje" htmlFor="new-interest">
-            <input id="new-interest" className={inputClass} value={draft} maxLength={60} onChange={(e) => setDraft(e.target.value)} />
-          </Field>
-        </div>
-        <Button type="submit" className="self-end" disabled={save.isPending || !draft.trim()}>
-          Dodaj
-        </Button>
-      </form>
+      <Combobox
+        label="Add an interest"
+        options={suggestions}
+        onSelect={add}
+        disabled={save.isPending}
+        placeholder={suggestions.length ? 'Pick from your CV topics or type your own' : 'Type a topic'}
+      />
       {save.isError && <ErrorAlert error={save.error} />}
     </div>
   )
@@ -115,10 +112,9 @@ function ConsentPanel({ eventId }: { eventId: string }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-700">
-        Svaki sponzor ili grupa vidi vaš CV i vaša pitanja samo ako im to ovde izričito dozvolite. Saglasnost možete promeniti u bilo kom
-        trenutku; ljudi, ne sistem, odlučuju koga kontaktiraju.
+        Each sponsor or group sees your CV and your questions only if you explicitly allow it here. You can change your consent at any time; people, not the system, decide whom to contact.
       </p>
-      {byRecipient.size === 0 && <EmptyState>Još nema objavljenih prilika na ovom događaju.</EmptyState>}
+      {byRecipient.size === 0 && <EmptyState>No opportunities have been posted for this event yet.</EmptyState>}
       <ul className="space-y-3">
         {[...byRecipient.entries()].map(([rid, list]) => (
           <li key={rid}>
@@ -143,7 +139,7 @@ function ConsentRow({ eventId, recipientId, opportunities }: { eventId: string; 
   })
   const current = save.data ?? saved
   const dirty = !current || current.allow_cv !== allowCv || current.allow_questions !== allowQ
-  const kind = opportunities[0].recipient_kind === 'sponsor' ? 'Sponzor' : 'Grupa'
+  const kind = opportunities[0].recipient_kind === 'sponsor' ? 'Sponsor' : 'Group'
   const base = `consent-${recipientId}`
 
   return (
@@ -162,21 +158,21 @@ function ConsentRow({ eventId, recipientId, opportunities }: { eventId: string; 
       <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
         <label htmlFor={`${base}-cv`} className="flex min-h-11 items-center gap-2">
           <input id={`${base}-cv`} type="checkbox" className="h-5 w-5" checked={allowCv} onChange={(e) => setAllowCv(e.target.checked)} />
-          Dozvoli uvid u CV
+          Allow access to my CV
         </label>
         <label htmlFor={`${base}-q`} className="flex min-h-11 items-center gap-2">
           <input id={`${base}-q`} type="checkbox" className="h-5 w-5" checked={allowQ} onChange={(e) => setAllowQ(e.target.checked)} />
-          Dozvoli uvid u moja pitanja
+          Allow access to my questions
         </label>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending || !dirty}>
-          {save.isPending ? 'Čuvanje…' : 'Sačuvaj saglasnost'}
+          {save.isPending ? 'Saving…' : 'Save consent'}
         </Button>
         <span className="text-xs text-slate-600" role="status">
           {current
-            ? `Sačuvano: CV ${current.allow_cv ? 'da' : 'ne'}, pitanja ${current.allow_questions ? 'da' : 'ne'}`
-            : 'Izbor još nije sačuvan u ovoj sesiji.'}
+            ? `Saved: CV ${current.allow_cv ? 'yes' : 'no'}, questions ${current.allow_questions ? 'yes' : 'no'}`
+            : 'No choice saved in this session yet.'}
         </span>
       </div>
       {save.isError && (
@@ -186,7 +182,7 @@ function ConsentRow({ eventId, recipientId, opportunities }: { eventId: string; 
       )}
       {!current && (
         <div className="mt-2">
-          <Notice>Prethodno sačuvani izbor nije prikazan (API v1 nema čitanje saglasnosti). Čuvanjem ga zamenjujete.</Notice>
+          <Notice>A previously saved choice is not shown (API v1 cannot read consents). Saving replaces it.</Notice>
         </div>
       )}
     </fieldset>

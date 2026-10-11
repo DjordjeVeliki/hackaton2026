@@ -56,7 +56,7 @@ export function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?
   return <span className={clsx('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', tones[tone])}>{children}</span>
 }
 
-export function Spinner({ label = 'Učitavanje…' }: { label?: string }) {
+export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return (
     <div role="status" className="flex items-center gap-2 py-4 text-slate-600">
       <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" aria-hidden />
@@ -72,7 +72,7 @@ export function EmptyState({ children }: { children: ReactNode }) {
 export function errorText(e: unknown): string {
   if (e instanceof ApiError) return e.message
   if (e instanceof Error) return e.message
-  return 'Došlo je do greške.'
+  return 'Something went wrong.'
 }
 
 export function ErrorAlert({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
@@ -80,10 +80,10 @@ export function ErrorAlert({ error, onRetry }: { error: unknown; onRetry?: () =>
   return (
     <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-900">
       <p>{errorText(error)}</p>
-      {requestId && <p className="mt-1 text-xs text-red-800">ID zahteva: {requestId}</p>}
+      {requestId && <p className="mt-1 text-xs text-red-800">Request ID: {requestId}</p>}
       {onRetry && (
         <Button size="sm" variant="secondary" className="mt-2" onClick={onRetry}>
-          Pokušaj ponovo
+          Try again
         </Button>
       )}
     </div>
@@ -102,11 +102,11 @@ export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?
 /** External link that only renders for http(s) URLs and never leaks the opener. */
 export function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
   const safe = safeExternalUrl(href)
-  if (!safe) return <span className="text-slate-600">{children} (nevažeći link)</span>
+  if (!safe) return <span className="text-slate-600">{children} (invalid link)</span>
   return (
     <a href={safe} target="_blank" rel="noopener noreferrer nofollow" referrerPolicy="no-referrer" className="text-brand-700 underline underline-offset-2 break-words">
       {children}
-      <span className="sr-only"> (otvara se u novom prozoru)</span>
+      <span className="sr-only"> (opens in a new window)</span>
     </a>
   )
 }
@@ -145,7 +145,7 @@ export function Drawer({
               )}
             </div>
             <Dialog.Close asChild>
-              <Button variant="ghost" size="sm" aria-label="Zatvori">
+              <Button variant="ghost" size="sm" aria-label="Close">
                 ✕
               </Button>
             </Dialog.Close>

@@ -29,20 +29,20 @@ export function SpeakerPage() {
     if (unreadOnly && q.read_status === 'read') continue
     groups.set(q.talk_id, [...(groups.get(q.talk_id) ?? []), q])
   }
-  const titleOf = (id: string) => talks.data?.find((t) => t.id === id)?.title ?? 'Predavanje'
+  const titleOf = (id: string) => talks.data?.find((t) => t.id === id)?.title ?? 'Talk'
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Pitanja publike</h1>
+        <h1 className="text-2xl font-bold">Audience questions</h1>
         <label className="flex min-h-11 items-center gap-2 text-sm">
           <input type="checkbox" className="h-5 w-5" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} />
-          Samo nepročitana
+          Unread only
         </label>
       </div>
       {questions.isPending && <Spinner />}
       {questions.isError && <ErrorAlert error={questions.error} onRetry={() => questions.refetch()} />}
-      {questions.isSuccess && groups.size === 0 && <EmptyState>Nema pitanja za prikaz.</EmptyState>}
+      {questions.isSuccess && groups.size === 0 && <EmptyState>No questions to show.</EmptyState>}
       {markRead.isError && <ErrorAlert error={markRead.error} />}
       {[...groups.entries()].map(([talkId, list]) => (
         <Card key={talkId} title={titleOf(talkId)} actions={<Badge>{list.length}</Badge>}>
@@ -62,10 +62,10 @@ export function SpeakerPage() {
                       onClick={() => markRead.mutate(q.id)}
                       disabled={markRead.isPending && markRead.variables === q.id}
                     >
-                      Označi kao pročitano
+                      Mark as read
                     </Button>
                   ) : (
-                    <Badge tone="green">Pročitano</Badge>
+                    <Badge tone="green">Read</Badge>
                   )}
                 </li>
               ))}

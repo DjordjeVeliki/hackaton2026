@@ -29,7 +29,7 @@ function setup(textSegment: (rid: string, seg: { sequence: number; text: string 
     textSegment: vi.fn(textSegment),
     stopRecording: vi.fn(async () => ({ status: 'stopped' })),
   }
-  const transcriber = new WebSpeechTranscriber({ ctor: Fake, now: () => 0 })
+  const transcriber = new WebSpeechTranscriber({ ctor: Fake, now: () => 0, settleMs: 5 })
   const c = new SpeakerTranscription({ api, transcriber, sleep: async () => {} })
   return { api, c }
 }
@@ -44,7 +44,7 @@ describe('SpeakerTranscription', () => {
     expect(Fake.last.lang).toBe('en-US')
     Fake.last.say('first')
     Fake.last.say('second')
-    await flush()
+    await vi.waitFor(() => expect(api.textSegment).toHaveBeenCalledTimes(2))
     await flush()
     expect(api.textSegment.mock.calls.map(([, s]) => [s.sequence, s.text])).toEqual([[0, 'first'], [1, 'second']])
     expect(c.getSnapshot()).toMatchObject({ sent: 2, pending: 0 })

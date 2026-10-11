@@ -26,7 +26,7 @@ import type {
 
 export class ContractError extends Error {
   constructor(message: string) {
-    super(`Odgovor servera ne odgovara ugovoru v1: ${message}`)
+    super(`Server response does not match contract v1: ${message}`)
     this.name = 'ContractError'
   }
 }
@@ -34,43 +34,43 @@ export class ContractError extends Error {
 type Obj = Record<string, unknown>
 
 function obj(v: unknown, what: string): Obj {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new ContractError(`${what} nije objekat`)
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new ContractError(`${what} is not an object`)
   return v as Obj
 }
 function str(o: Obj, k: string): string {
   const v = o[k]
-  if (typeof v !== 'string') throw new ContractError(`polje ${k} nije string`)
+  if (typeof v !== 'string') throw new ContractError(`polje ${k} is not a string`)
   return v
 }
 function strOrNull(o: Obj, k: string): string | null {
   const v = o[k]
   if (v === null || v === undefined) return null
-  if (typeof v !== 'string') throw new ContractError(`polje ${k} nije string`)
+  if (typeof v !== 'string') throw new ContractError(`polje ${k} is not a string`)
   return v
 }
 function int(o: Obj, k: string): number {
   const v = o[k]
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw new ContractError(`polje ${k} nije broj`)
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new ContractError(`polje ${k} is not a number`)
   return Math.trunc(v)
 }
 function bool(o: Obj, k: string): boolean {
   const v = o[k]
-  if (typeof v !== 'boolean') throw new ContractError(`polje ${k} nije boolean`)
+  if (typeof v !== 'boolean') throw new ContractError(`polje ${k} is not a boolean`)
   return v
 }
 function oneOf<T extends string>(o: Obj, k: string, allowed: readonly T[]): T {
   const v = str(o, k)
-  if (!(allowed as readonly string[]).includes(v)) throw new ContractError(`polje ${k} ima nepoznatu vrednost`)
+  if (!(allowed as readonly string[]).includes(v)) throw new ContractError(`polje ${k} has an unknown value`)
   return v as T
 }
 function arr<T>(o: Obj, k: string, map: (v: unknown) => T): T[] {
   const v = o[k]
-  if (!Array.isArray(v)) throw new ContractError(`polje ${k} nije niz`)
+  if (!Array.isArray(v)) throw new ContractError(`polje ${k} is not an array`)
   return v.map(map)
 }
 function strings(o: Obj, k: string): string[] {
   return arr(o, k, (v) => {
-    if (typeof v !== 'string') throw new ContractError(`${k} sadrži ne-string`)
+    if (typeof v !== 'string') throw new ContractError(`${k} contains a non-string`)
     return v
   })
 }
@@ -178,8 +178,8 @@ export function recordingSession(v: unknown): RecordingSession {
     sample_rate_hz: int(o, 'sample_rate_hz'),
     chunk_seconds: int(o, 'chunk_seconds'),
   }
-  if (session.sample_rate_hz < 8000 || session.sample_rate_hz > 48000) throw new ContractError('sample_rate_hz van opsega')
-  if (session.chunk_seconds < 1 || session.chunk_seconds > 60) throw new ContractError('chunk_seconds van opsega')
+  if (session.sample_rate_hz < 8000 || session.sample_rate_hz > 48000) throw new ContractError('sample_rate_hz out of range')
+  if (session.chunk_seconds < 1 || session.chunk_seconds > 60) throw new ContractError('chunk_seconds out of range')
   return session
 }
 

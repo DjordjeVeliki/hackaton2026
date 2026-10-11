@@ -60,7 +60,7 @@ export function AppRoutes() {
         <Route path="/speaker/events/:eventId" element={<Lazy><SpeakerPage /></Lazy>} />
         <Route path="/sponsor/events/:eventId" element={<Suspense fallback={<Spinner />}><SponsorPage /></Suspense>} />
         <Route path="/organizer/events/:eventId" element={<Suspense fallback={<Spinner />}><OrganizerPage /></Suspense>} />
-        <Route path="*" element={<p className="p-4">Stranica ne postoji.</p>} />
+        <Route path="*" element={<p className="p-4">Page not found.</p>} />
       </Route>
     </Routes>
   )

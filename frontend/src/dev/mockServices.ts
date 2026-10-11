@@ -112,7 +112,7 @@ function createMockFetch(apiBaseUrl: string, currentUser: () => AuthUser | null)
     await new Promise((r) => setTimeout(r, 150 + Math.random() * 250))
     const user = currentUser()
     const authz = new Headers(init.headers).get('Authorization')
-    if (!user || !authz?.startsWith('Bearer synthetic-dev-token')) return err(401, 'UNAUTHENTICATED', 'Niste prijavljeni.')
+    if (!user || !authz?.startsWith('Bearer synthetic-dev-token')) return err(401, 'UNAUTHENTICATED', 'You are not signed in.')
     const u = new URL(url)
     const path = u.href.slice(base.length).split('?')[0]
     const method = (init.method ?? 'GET').toUpperCase()

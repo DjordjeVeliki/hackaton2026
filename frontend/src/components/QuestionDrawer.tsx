@@ -36,9 +36,9 @@ export function useQuestionComposer(talkId: string) {
     onError: (e) => {
       if (isApiError(e, 'QUESTION_LIMIT_REACHED')) {
         pending.current = null
-        setNotice('Iskoristili ste sva 3 pitanja za ovo predavanje. Vaš tekst je sačuvan u polju, ali ne može biti poslat.')
+        setNotice('You have used all 3 questions for this talk. Your text is kept in the box but cannot be sent.')
       } else if (isApiError(e) && e.status === 409) {
-        setNotice('Stanje se promenilo na drugom uređaju. Osvežili smo listu — proverite pa pošaljite ponovo.')
+        setNotice('Something changed on another device. We refreshed the list — check it and send again.')
       } else {
         setNotice(null)
       }
@@ -82,16 +82,16 @@ export function QuestionDrawer({ talkId, open, onOpenChange }: { talkId: string;
     <Drawer
       open={open}
       onOpenChange={onOpenChange}
-      title="Pitanje za govornika"
-      description="Pitanja se čuvaju i govornik ih čita na kraju. Ovde nema automatskih odgovora."
+      title="Question for the speaker"
+      description="Questions are saved and the speaker reads them at the end. There are no automatic answers here."
       footer={
         <form onSubmit={onSubmit} className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <label htmlFor={inputId} className="font-medium">
-              Vaše pitanje
+              Your question
             </label>
             <span aria-live="polite" className={exhausted ? 'font-semibold text-red-700' : 'text-slate-700'}>
-              {q ? `${q.used}/${q.limit} pitanja` : '–/3 pitanja'}
+              {q ? `${q.used}/${q.limit} questions` : '–/3 questions'}
             </span>
           </div>
           <textarea
@@ -105,7 +105,7 @@ export function QuestionDrawer({ talkId, open, onOpenChange }: { talkId: string;
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) c.submit()
             }}
             disabled={exhausted && !c.text}
-            placeholder={exhausted ? 'Nema preostalih pitanja za ovo predavanje.' : 'Napišite pitanje…'}
+            placeholder={exhausted ? 'No questions left for this talk.' : 'Write your question…'}
           />
           {c.notice && (
             <p role="alert" className="text-sm text-amber-900">
@@ -114,13 +114,13 @@ export function QuestionDrawer({ talkId, open, onOpenChange }: { talkId: string;
           )}
           {failed && (
             <p role="alert" className="text-sm text-red-700">
-              Slanje nije uspelo ({errorText(c.mutation.error)}). Tekst je sačuvan — pokušajte ponovo; pitanje neće biti poslato dvaput.
+              Sending failed ({errorText(c.mutation.error)}). Your text is kept — try again; the question will not be sent twice.
             </p>
           )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-slate-600">{c.text.length}/{MAX_LEN}</span>
             <Button type="submit" disabled={!c.text.trim() || c.mutation.isPending || exhausted}>
-              {c.mutation.isPending ? 'Slanje…' : failed ? 'Pošalji ponovo' : 'Pošalji'}
+              {c.mutation.isPending ? 'Sending…' : failed ? 'Send again' : 'Send'}
             </Button>
           </div>
         </form>
@@ -130,14 +130,14 @@ export function QuestionDrawer({ talkId, open, onOpenChange }: { talkId: string;
       {list.isError && <ErrorAlert error={list.error} onRetry={() => list.refetch()} />}
       {quota.isError && <ErrorAlert error={quota.error} onRetry={() => quota.refetch()} />}
       {list.data && list.data.length === 0 && (
-        <p className="text-center text-sm text-slate-600">Još niste postavili pitanje za ovo predavanje. Možete postaviti do 3.</p>
+        <p className="text-center text-sm text-slate-600">You haven’t asked a question for this talk yet. You can ask up to 3.</p>
       )}
-      <ol className="space-y-3" aria-label="Vaša pitanja">
+      <ol className="space-y-3" aria-label="Your questions">
         {list.data?.map((qq) => (
           <li key={qq.id} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-brand-600 px-3 py-2 text-white">
             <p className="whitespace-pre-wrap break-words">{qq.text}</p>
             <p className="mt-1 text-right text-xs text-brand-100">
-              Sačuvano {fmtClock(qq.submitted_at)} · {qq.read_status === 'read' ? 'govornik je pročitao' : 'čeka govornika'}
+              Saved {fmtClock(qq.submitted_at)} · {qq.read_status === 'read' ? 'read by the speaker' : 'waiting for the speaker'}
             </p>
           </li>
         ))}
@@ -152,8 +152,8 @@ export function QuestionFab({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Postavi pitanje"
-      title="Postavi pitanje"
+      aria-label="Ask a question"
+      title="Ask a question"
       className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 sm:bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl font-bold text-white shadow-lg hover:bg-brand-700"
     >
       ?

@@ -22,44 +22,44 @@ export function useSpeakerTranscription() {
 }
 
 const LANGS = [
+  { value: 'en-US', label: 'EN' },
   { value: 'sr-RS', label: 'SR' },
   { value: 'hr-HR', label: 'HR' },
-  { value: 'en-US', label: 'EN' },
 ]
 
 /** Speaker-only: one large start/stop control for the talk's live transcript. */
 export function SpeakerLive({ talkId }: { talkId: string }) {
   const { controller, snap, speech } = useSpeakerTranscription()
   const qc = useQueryClient()
-  const [lang, setLang] = useState('sr-RS')
+  const [lang, setLang] = useState('en-US')
   const refreshSource = () => void qc.invalidateQueries({ queryKey: qk.talkTranscript(talkId) })
   const mine = snap.talkId === talkId
   const live = mine && (snap.status === 'live' || snap.status === 'starting')
   const busyElsewhere = !mine && controller.isActive
 
   if (!controller.supported) {
-    return <Notice tone="warn">Ovaj pregledač ne podržava prepoznavanje govora. Otvorite Cuevia u Chrome-u ili Edge-u.</Notice>
+    return <Notice tone="warn">This browser does not support speech recognition. Open Cuevia in Chrome or Edge.</Notice>
   }
   if (busyElsewhere) {
-    return <Notice tone="warn">Transkripcija je već pokrenuta za drugo predavanje. Prvo je zaustavite tamo.</Notice>
+    return <Notice tone="warn">Transcription is already running for another talk. Stop it there first.</Notice>
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Transkripcija predavanja">
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Talk transcription">
       {live ? (
         <>
           <div className="flex items-center justify-between gap-3" role="status" aria-live="polite">
             <span className="flex items-center gap-2 font-semibold text-red-700">
               <span className="h-3 w-3 animate-pulse rounded-full bg-red-600" aria-hidden />
-              {snap.status === 'starting' ? 'Pokrećem…' : 'Uživo'}
+              {snap.status === 'starting' ? 'Starting…' : 'Live'}
             </span>
             <span className="text-sm text-slate-600 tabular-nums">
-              {snap.sent} poslato{snap.pending > 0 ? ` · ${snap.pending} čeka` : ''}
+              {snap.sent} sent{snap.pending > 0 ? ` · ${snap.pending} pending` : ''}
             </span>
           </div>
           {speech.interim && <p className="line-clamp-2 text-base text-slate-500 italic">{speech.interim}…</p>}
           <Button className="min-h-14 w-full text-lg" variant="secondary" onClick={() => void controller.stop().then(refreshSource)}>
-            ■ Zaustavi transkripciju
+            ■ Stop transcription
           </Button>
         </>
       ) : (
@@ -69,9 +69,9 @@ export function SpeakerLive({ talkId }: { talkId: string }) {
             disabled={snap.status === 'stopping'}
             onClick={() => void controller.start(talkId, lang).then(refreshSource)}
           >
-            {snap.status === 'stopping' ? 'Završavam…' : '▶ Pokreni transkripciju'}
+            {snap.status === 'stopping' ? 'Finishing…' : '▶ Start transcription'}
           </Button>
-          <div className="flex items-center justify-center gap-1" role="radiogroup" aria-label="Jezik predavanja">
+          <div className="flex items-center justify-center gap-1" role="radiogroup" aria-label="Talk language">
             {LANGS.map((l) => (
               <button
                 key={l.value}

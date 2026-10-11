@@ -36,12 +36,12 @@ export function LoginPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-4">
       <div>
         <h1 className="text-3xl font-bold text-brand-700">Cuevia</h1>
-        <p className="text-slate-700">Prati predavanje, sustigni propušteno, postavi pitanje govorniku.</p>
+        <p className="text-slate-700">Follow the talk, catch up on what you missed, ask the speaker a question.</p>
       </div>
-      {mocks && <Notice tone="warn">Razvojni režim: sintetička prijava, nijedan nalog nije stvaran.</Notice>}
-      {loc.state?.expired && <Notice tone="warn">Sesija je istekla. Prijavite se ponovo.</Notice>}
+      {mocks && <Notice tone="warn">Development mode: synthetic sign-in, no account is real.</Notice>}
+      {loc.state?.expired && <Notice tone="warn">Your session expired. Please sign in again.</Notice>}
       <Card>
-        <div role="tablist" aria-label="Način pristupa" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+        <div role="tablist" aria-label="Access mode" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
           {(['login', 'register'] as const).map((m) => (
             <button
               key={m}
@@ -51,20 +51,20 @@ export function LoginPage() {
               onClick={() => setMode(m)}
               className={`min-h-10 rounded-md text-sm font-medium ${mode === m ? 'bg-white shadow-sm' : 'text-slate-700'}`}
             >
-              {m === 'login' ? 'Prijava' : 'Registracija'}
+              {m === 'login' ? 'Sign in' : 'Sign up'}
             </button>
           ))}
         </div>
         <form onSubmit={submit} className="space-y-3">
           {mode === 'register' && (
-            <Field label="Ime i prezime" htmlFor="name">
+            <Field label="Full name" htmlFor="name">
               <input id="name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
             </Field>
           )}
-          <Field label="E-mail" htmlFor="email">
+          <Field label="Email" htmlFor="email">
             <input id="email" type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
           </Field>
-          <Field label="Lozinka" htmlFor="password" hint={mode === 'register' ? 'Najmanje 6 karaktera.' : undefined}>
+          <Field label="Password" htmlFor="password" hint={mode === 'register' ? 'At least 6 characters.' : undefined}>
             <input
               id="password"
               type="password"
@@ -82,7 +82,7 @@ export function LoginPage() {
             </p>
           )}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? 'Sačekajte…' : mode === 'login' ? 'Prijavi se' : 'Napravi nalog'}
+            {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </Button>
         </form>
         {auth.googleEnabled && (
@@ -99,12 +99,12 @@ export function LoginPage() {
               }
             }}
           >
-            Nastavi sa Google nalogom
+            Continue with Google
           </Button>
         )}
       </Card>
       <p className="text-xs text-slate-600">
-        Nakon registracije možete (ali ne morate) da otpremite CV. Sve funkcije praćenja predavanja rade i bez njega.
+        After signing up you can (but don’t have to) upload a CV. All talk features work without it.
       </p>
     </main>
   )

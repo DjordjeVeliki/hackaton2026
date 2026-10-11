@@ -19,7 +19,7 @@ const prefersReducedMotion = () =>
 /**
  * Readable timed transcript with a history slider. While "following live" new
  * segments scroll into view; moving the slider or scrolling up pauses that
- * until "Vrati se uživo".
+ * until "Back to live".
  */
 export const Transcript = forwardRef<
   TranscriptHandle,
@@ -98,17 +98,17 @@ export const Transcript = forwardRef<
         className="h-[52dvh] overflow-y-auto p-4"
         role="log"
         aria-live={followLive ? 'polite' : 'off'}
-        aria-label="Transkript"
+        aria-label="Transcript"
         tabIndex={0}
       >
         {segments.length === 0 && (
-          <p className="text-slate-600">Transkript će se pojaviti nekoliko sekundi nakon početka snimanja.</p>
+          <p className="text-slate-600">The transcript will appear a few seconds after the talk starts.</p>
         )}
         <ol className="space-y-3">
           {segments.map((s) =>
             s.status === 'gap' ? (
               <li key={s.sequence} data-segment-id={s.id} className="text-center text-sm text-slate-500 italic">
-                — prekid u transkriptu {fmtMs(s.start_ms)}–{fmtMs(s.end_ms)} —
+                — gap in the transcript {fmtMs(s.start_ms)}–{fmtMs(s.end_ms)} —
               </li>
             ) : (
               <li
@@ -139,14 +139,14 @@ export const Transcript = forwardRef<
             setHighlight(segments[v]?.id ?? null)
             scrollToIndex(v)
           }}
-          aria-label="Istorija transkripta"
+          aria-label="Transcript history"
         >
           <Slider.Track className="relative h-1.5 flex-1 rounded-full bg-slate-200">
             <Slider.Range className="absolute h-full rounded-full bg-brand-600" />
           </Slider.Track>
           <Slider.Thumb
             className="block h-5 w-5 rounded-full border-2 border-brand-600 bg-white shadow"
-            aria-valuetext={segments[sliderValue] ? fmtMs(segments[sliderValue].start_ms) : 'nema segmenata'}
+            aria-valuetext={segments[sliderValue] ? fmtMs(segments[sliderValue].start_ms) : 'no lines'}
           />
         </Slider.Root>
         {!followLive ? (
@@ -157,12 +157,12 @@ export const Transcript = forwardRef<
               setHighlight(null)
             }}
           >
-            Vrati se uživo ↓
+            Back to live ↓
           </Button>
         ) : (
-          <span className="text-xs text-slate-600">Prati uživo</span>
+          <span className="text-xs text-slate-600">Following live</span>
         )}
-        {lagMs > 0 && <span className="text-xs text-slate-600">kašnjenje obrade ~{Math.round(lagMs / 1000)} s</span>}
+        {lagMs > 0 && <span className="text-xs text-slate-600">processing delay ~{Math.round(lagMs / 1000)} s</span>}
       </div>
     </div>
   )

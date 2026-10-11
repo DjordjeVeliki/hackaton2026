@@ -5,9 +5,9 @@ import { ProfileStatus } from '../components/CvPanel'
 import { Badge, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
 
 const TALK_STATUS: Record<TalkStatus, { text: string; tone: 'green' | 'slate' | 'amber' }> = {
-  live: { text: 'U toku', tone: 'green' },
-  scheduled: { text: 'Zakazano', tone: 'amber' },
-  ended: { text: 'Završeno', tone: 'slate' },
+  live: { text: 'Live', tone: 'green' },
+  scheduled: { text: 'Scheduled', tone: 'amber' },
+  ended: { text: 'Ended', tone: 'slate' },
 }
 
 export function EventHomePage() {
@@ -21,10 +21,10 @@ export function EventHomePage() {
     <div className="space-y-4">
       {!isSpeaker && me.isSuccess && (
       <Card
-        title="Vaš profil"
+        title="Your profile"
         actions={
           <Link to={`/events/${eventId}/profile`} className="text-sm font-medium text-brand-700 underline">
-            Uredi CV, interesovanja i deljenje
+            Edit CV, interests and sharing
           </Link>
         }
       >
@@ -34,10 +34,10 @@ export function EventHomePage() {
       </Card>
       )}
 
-      <h1 className="text-2xl font-bold">Predavanja</h1>
+      <h1 className="text-2xl font-bold">Talks</h1>
       {talks.isPending && <Spinner />}
       {talks.isError && <ErrorAlert error={talks.error} onRetry={() => talks.refetch()} />}
-      {talks.data?.length === 0 && <EmptyState>Za ovaj događaj još nema predavanja.</EmptyState>}
+      {talks.data?.length === 0 && <EmptyState>This event has no talks yet.</EmptyState>}
       <ul className="space-y-3">
         {talks.data?.map((t) => (
           <li key={t.id}>

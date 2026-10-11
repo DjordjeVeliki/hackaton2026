@@ -19,7 +19,7 @@ export function createFirebaseAuth(cfg: AppConfig): AuthBackend {
   const f = cfg.firebase
   if (!f.apiKey || !f.authDomain || !f.projectId || !f.appId) {
     throw new FirebaseConfigError(
-      'Firebase nije podešen. Popunite VITE_FIREBASE_* vrednosti u frontend/.env.local (vidi .env.example).',
+      'Firebase is not configured. Fill in the VITE_FIREBASE_* values in frontend/.env.local (see .env.example).',
     )
   }
   const app: FirebaseApp = initializeApp(f)
@@ -45,7 +45,7 @@ export function createFirebaseAuth(cfg: AppConfig): AuthBackend {
       await cred.user.getIdToken(true)
     },
     async signInWithGoogle() {
-      if (!cfg.googleSignIn) throw new Error('Google prijava nije omogućena.')
+      if (!cfg.googleSignIn) throw new Error('Google sign-in is not enabled.')
       const { googleSignIn } = await import('./googleSignIn')
       await googleSignIn(auth)
     },
@@ -60,17 +60,17 @@ export function createFirebaseAuth(cfg: AppConfig): AuthBackend {
 }
 
 const MESSAGES: Record<string, string> = {
-  'auth/invalid-credential': 'Pogrešan e-mail ili lozinka.',
-  'auth/invalid-email': 'Neispravan e-mail.',
-  'auth/email-already-in-use': 'Nalog sa ovim e-mailom već postoji.',
-  'auth/weak-password': 'Lozinka mora imati najmanje 6 karaktera.',
-  'auth/too-many-requests': 'Previše pokušaja. Pokušajte ponovo kasnije.',
-  'auth/network-request-failed': 'Nema mrežne veze.',
-  'auth/popup-closed-by-user': 'Prozor za prijavu je zatvoren.',
+  'auth/invalid-credential': 'Wrong email or password.',
+  'auth/invalid-email': 'Invalid email.',
+  'auth/email-already-in-use': 'An account with this email already exists.',
+  'auth/weak-password': 'Password must be at least 6 characters.',
+  'auth/too-many-requests': 'Too many attempts. Try again later.',
+  'auth/network-request-failed': 'No network connection.',
+  'auth/popup-closed-by-user': 'The sign-in window was closed.',
 }
 
 export function authErrorMessage(e: unknown): string {
   const code = (e as { code?: string })?.code
   if (code && MESSAGES[code]) return MESSAGES[code]
-  return e instanceof Error ? e.message : 'Prijava nije uspela.'
+  return e instanceof Error ? e.message : 'Sign-in failed.'
 }

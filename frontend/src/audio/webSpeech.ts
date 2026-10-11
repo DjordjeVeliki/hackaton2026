@@ -57,11 +57,11 @@ export interface WebSpeechSnapshot {
 }
 
 const ERRORS: Record<string, string> = {
-  'not-allowed': 'Pristup mikrofonu ili prepoznavanju govora je odbijen u pregledaču.',
-  'service-not-allowed': 'Pregledač ne dozvoljava prepoznavanje govora na ovoj stranici.',
-  'audio-capture': 'Mikrofon nije dostupan.',
-  network: 'Prepoznavanje govora zahteva internet vezu (servis pregledača nije dostupan).',
-  'language-not-supported': 'Izabrani jezik nije podržan za prepoznavanje govora u ovom pregledaču.',
+  'not-allowed': 'Microphone or speech recognition access was denied in the browser.',
+  'service-not-allowed': 'The browser does not allow speech recognition on this page.',
+  'audio-capture': 'Microphone not available.',
+  network: 'Speech recognition needs an internet connection (the browser’s service is unreachable).',
+  'language-not-supported': 'The selected language is not supported for speech recognition in this browser.',
 }
 // Errors after which restarting would just fail again.
 const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'])
@@ -69,6 +69,21 @@ const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture', 'l
 export interface WebSpeechDeps {
   ctor?: SpeechRecognitionCtor | null
   now?: () => number
+  /** Quiet time after the last final result before the held utterance is published. */
+  settleMs?: number
+}
+
+/** Lower-case word list without punctuation, for comparing revisions of the same utterance. */
+function words(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s']/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function isPrefix(a: string[], b: string[]): boolean {
+  return a.length <= b.length && a.every((w, i) => w === b[i])
 }
 
 /**
@@ -83,6 +98,13 @@ export class WebSpeechTranscriber {
   private wanted = false
   private startedAt = 0
   private utteranceStart: number | null = null
+  /** Finalized text held back until it stops growing (Android re-sends growing finals). */
+  private held: { text: string; start: number; end: number } | null = null
+  private settleTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly settleMs: number
+  /** Final text already handled at each result index of the current recognition session. */
+  private seenFinals = new Map<number, string>()
+  private lastPublished: string[] = []
   private seq = 0
   private restarts = 0
   private listeners = new Set<() => void>()
@@ -92,7 +114,8 @@ export class WebSpeechTranscriber {
   constructor(deps: WebSpeechDeps = {}) {
     this.ctor = deps.ctor === undefined ? getSpeechRecognition() : deps.ctor
     this.now = deps.now ?? (() => performance.now())
-    this.snap = { status: this.ctor ? 'idle' : 'unsupported', lang: 'sr-RS', segments: [], interim: '', error: null }
+    this.settleMs = deps.settleMs ?? 1200
+    this.snap = { status: this.ctor ? 'idle' : 'unsupported', lang: 'en-US', segments: [], interim: '', error: null }
   }
 
   get supported() {
@@ -120,8 +143,9 @@ export class WebSpeechTranscriber {
     this.wanted = true
     this.restarts = 0
     if (this.snap.status !== 'stopped' || this.snap.segments.length === 0) {
-      // New session; "Nastavi" after a stop keeps the existing text and timeline.
+      // New session; "Resume" after a stop keeps the existing text and timeline.
       this.seq = 0
+      this.lastPublished = []
       this.startedAt = this.now()
       this.set({ segments: [], interim: '' })
     }
@@ -138,6 +162,7 @@ export class WebSpeechTranscriber {
       rec.stop()
     }
     this.commitInterim()
+    this.flushHeld()
     this.set({ status: this.ctor ? 'stopped' : 'unsupported', interim: '' })
   }
 
@@ -151,6 +176,8 @@ export class WebSpeechTranscriber {
   reset() {
     if (this.wanted) return
     this.seq = 0
+    this.lastPublished = []
+    this.held = null
     this.set({ status: this.ctor ? 'idle' : 'unsupported', segments: [], interim: '', error: null })
   }
 
@@ -164,38 +191,90 @@ export class WebSpeechTranscriber {
     rec.onerror = (e) => this.onError(e)
     rec.onend = () => this.onEnd()
     this.rec = rec
+    this.seenFinals.clear() // result indexes restart with every recognition session
     try {
       rec.start()
       this.set({ status: 'listening' })
     } catch (e) {
       this.wanted = false
       this.rec = null
-      this.set({ status: 'error', error: e instanceof Error ? e.message : 'Prepoznavanje govora nije moguće pokrenuti.' })
+      this.set({ status: 'error', error: e instanceof Error ? e.message : 'Could not start speech recognition.' })
     }
   }
 
   private onResult(e: SpeechResultEvent) {
     const t = this.now() - this.startedAt
     let interim = ''
-    const finals: string[] = []
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i]
       const text = (r[0]?.transcript ?? '').trim()
       if (!text) continue
-      if (r.isFinal) finals.push(text)
-      else interim += (interim ? ' ' : '') + text
+      if (r.isFinal) {
+        if (this.seenFinals.get(i) === text) continue // re-sent old final (seen on Android)
+        this.seenFinals.set(i, text)
+        if (this.utteranceStart === null) this.utteranceStart = t
+        this.acceptFinal(text, t)
+      } else {
+        interim += (interim ? ' ' : '') + text
+      }
     }
-    if (this.utteranceStart === null && (finals.length || interim)) this.utteranceStart = t
-    if (finals.length) {
-      this.pushSegment(finals.join(' '), this.utteranceStart ?? t, t)
-      this.utteranceStart = interim ? t : null
+    if (interim && this.utteranceStart === null) this.utteranceStart = t
+    this.set({ interim: [this.held?.text, interim].filter(Boolean).join(' ') })
+  }
+
+  /**
+   * Chrome on Android (continuous mode) reports every growing version of an utterance as a new
+   * final result: "okay so", "okay so I'm", "okay so I'm speaking"... Hold the latest version and
+   * replace it while new finals merely extend or repeat it; publish once a different utterance
+   * starts or the speaker pauses.
+   */
+  private acceptFinal(text: string, t: number) {
+    const w = words(text)
+    if (!w.length) return
+    if (this.held) {
+      const hw = words(this.held.text)
+      if (isPrefix(hw, w)) {
+        this.held = { ...this.held, text, end: t }
+      } else if (!isPrefix(w, hw)) {
+        this.flushHeld()
+        this.held = { text, start: this.utteranceStart ?? t, end: t }
+      }
+    } else if (isPrefix(w, this.lastPublished)) {
+      return // late repeat of something already published
+    } else if (this.lastPublished.length && isPrefix(this.lastPublished, w)) {
+      // Late extension of the published utterance: keep only the new words.
+      const extra = text.split(/\s+/).slice(this.lastPublished.length).join(' ')
+      this.held = { text: extra, start: t, end: t }
+      this.lastPublished = w
+      this.flushHeld(w)
+      return
+    } else {
+      this.held = { text, start: this.utteranceStart ?? t, end: t }
     }
-    this.set({ interim })
+    this.utteranceStart = null
+    if (this.settleTimer) clearTimeout(this.settleTimer)
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = null
+      this.flushHeld()
+      this.set({ interim: this.snap.interim && !this.held ? this.snap.interim : '' })
+    }, this.settleMs)
+  }
+
+  private flushHeld(publishedWords?: string[]) {
+    if (this.settleTimer) {
+      clearTimeout(this.settleTimer)
+      this.settleTimer = null
+    }
+    const h = this.held
+    this.held = null
+    if (!h || !h.text.trim()) return
+    this.lastPublished = publishedWords ?? words(h.text)
+    this.pushSegment(h.text, h.start, h.end)
   }
 
   private onError(e: SpeechErrorEvent) {
     if (e.error === 'no-speech' || e.error === 'aborted') return // normal; onend restarts
-    this.set({ error: ERRORS[e.error] ?? `Greška prepoznavanja govora: ${e.error}` })
+    this.set({ error: ERRORS[e.error] ?? `Speech recognition error: ${e.error}` })
     if (FATAL.has(e.error)) {
       this.wanted = false
       this.set({ status: 'error' })
@@ -205,24 +284,25 @@ export class WebSpeechTranscriber {
   private onEnd() {
     this.rec = null
     this.commitInterim()
+    this.flushHeld()
     if (!this.wanted) {
       if (this.snap.status === 'listening') this.set({ status: 'stopped' })
       return
     }
     if (++this.restarts > 50) {
       this.wanted = false
-      this.set({ status: 'error', error: 'Prepoznavanje govora se stalno prekida; pokušajte ponovo.' })
+      this.set({ status: 'error', error: 'Speech recognition keeps stopping; please try again.' })
       return
     }
     this.open()
   }
 
   private commitInterim() {
-    const text = this.snap.interim.trim()
-    if (!text) return
-    const t = this.now() - this.startedAt
-    this.pushSegment(text, this.utteranceStart ?? t, t)
-    this.utteranceStart = null
+    // snap.interim shows held text + live interim; the live part is whatever follows the held text.
+    const shown = this.snap.interim.trim()
+    const held = this.held?.text ?? ''
+    const live = held && shown.startsWith(held) ? shown.slice(held.length).trim() : shown
+    if (live) this.acceptFinal(held ? `${held} ${live}` : live, this.now() - this.startedAt)
     this.set({ interim: '' })
   }
 

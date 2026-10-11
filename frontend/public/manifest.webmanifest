@@ -1,8 +1,8 @@
 {
   "name": "Cuevia",
   "short_name": "Cuevia",
-  "description": "Transkript predavanja uživo, objašnjenja pojmova i pitanja govorniku.",
-  "lang": "sr-Latn",
+  "description": "Live talk transcripts, term explanations and questions for the speaker.",
+  "lang": "en",
   "start_url": "/events",
   "scope": "/",
   "display": "standalone",

@@ -69,14 +69,14 @@ export class RecordingController {
   async start(talkId: string): Promise<void> {
     if (this.isActive) {
       if (this.snap.talkId === talkId) return
-      throw new Error('Snimanje je već aktivno za drugo predavanje. Prvo ga zaustavite.')
+      throw new Error('Recording is already active for another talk. Stop it first.')
     }
     this.set({ status: 'starting', talkId, session: null, error: null, upload: EMPTY_UPLOAD, elapsedMs: 0 })
     let session: RecordingSession
     try {
       session = await this.deps.api.startRecording(talkId)
     } catch (e) {
-      this.set({ status: 'error', error: message(e, 'Snimanje nije moguće započeti.') })
+      this.set({ status: 'error', error: message(e, 'Could not start recording.') })
       return
     }
     this.chunker = new Chunker(session.sample_rate_hz, session.chunk_seconds)
@@ -120,7 +120,7 @@ export class RecordingController {
       await this.deps.api.stopRecording(session.recording_id)
       this.set({ status: 'stopped' })
     } catch (e) {
-      this.set({ status: 'stopped', error: message(e, 'Server nije potvrdio zaustavljanje snimanja.') })
+      this.set({ status: 'stopped', error: message(e, 'The server did not confirm that recording stopped.') })
     }
   }
 
@@ -143,7 +143,7 @@ export class RecordingController {
       this.set({ status: 'recording', error: null })
       void this.acquireWakeLock()
     } catch (e) {
-      this.set({ status: 'error', error: message(e, 'Mikrofon nije moguće pokrenuti.') })
+      this.set({ status: 'error', error: message(e, 'Could not start the microphone.') })
     }
   }
 

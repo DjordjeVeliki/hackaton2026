@@ -26,15 +26,15 @@ type AudioContextCtor = typeof AudioContext
 export const startBrowserCapture: StartCapture = async ({ preferredSampleRate, onFrames, onEnded }) => {
   if (typeof window === 'undefined' || !window.isSecureContext) {
     throw new CaptureError(
-      'Mikrofon zahteva HTTPS (ili localhost). Otvorite aplikaciju preko https:// adrese na telefonu.',
+      'The microphone requires HTTPS (or localhost). Open the app via an https:// address on your phone.',
     )
   }
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new CaptureError('Ovaj pregledač ne podržava snimanje mikrofona.')
+    throw new CaptureError('This browser does not support microphone recording.')
   }
   const Ctor: AudioContextCtor | undefined =
     window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext
-  if (!Ctor) throw new CaptureError('Ovaj pregledač ne podržava Web Audio API.')
+  if (!Ctor) throw new CaptureError('This browser does not support the Web Audio API.')
 
   let stream: MediaStream
   try {
@@ -45,10 +45,10 @@ export const startBrowserCapture: StartCapture = async ({ preferredSampleRate, o
   } catch (e) {
     const name = (e as DOMException)?.name
     if (name === 'NotAllowedError' || name === 'SecurityError')
-      throw new CaptureError('Pristup mikrofonu je odbijen. Dozvolite mikrofon u podešavanjima pregledača.')
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new CaptureError('Mikrofon nije pronađen.')
-    if (name === 'NotReadableError') throw new CaptureError('Mikrofon koristi druga aplikacija.')
-    throw new CaptureError('Mikrofon nije moguće pokrenuti.')
+      throw new CaptureError('Microphone access was denied. Allow the microphone in your browser settings.')
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new CaptureError('No microphone found.')
+    if (name === 'NotReadableError') throw new CaptureError('The microphone is in use by another app.')
+    throw new CaptureError('Could not start the microphone.')
   }
 
   const stopTracks = () => stream.getTracks().forEach((t) => t.stop())
@@ -67,7 +67,7 @@ export const startBrowserCapture: StartCapture = async ({ preferredSampleRate, o
     await ctx.resume()
   } catch {
     stopTracks()
-    throw new CaptureError('Audio obrada nije moguća u ovom pregledaču.')
+    throw new CaptureError('Audio processing is not available in this browser.')
   }
 
   const sink = ctx.createGain()
@@ -100,7 +100,7 @@ export const startBrowserCapture: StartCapture = async ({ preferredSampleRate, o
   let stopped = false
   const track = stream.getAudioTracks()[0]
   track?.addEventListener('ended', () => {
-    if (!stopped) onEnded('Mikrofon je prestao da šalje zvuk (dozvola opozvana ili uređaj isključen).')
+    if (!stopped) onEnded('The microphone stopped sending audio (permission revoked or device disconnected).')
   })
 
   return {

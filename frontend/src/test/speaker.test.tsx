@@ -69,21 +69,24 @@ describe('speaker live transcription', () => {
     const user = userEvent.setup()
     renderAt('/events/e1/talks/t1', makeServices(fn))
 
-    expect(await screen.findByText(/Pokrenite transkripciju kada počnete predavanje/)).toBeInTheDocument()
+    expect(await screen.findByText(/Start transcription when you begin your talk/)).toBeInTheDocument()
     // Speakers do not ask questions.
-    expect(screen.queryByRole('button', { name: 'Postavi pitanje' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ask a question' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Pokreni transkripciju/ }))
-    await screen.findByRole('button', { name: /Zaustavi transkripciju/ })
-    expect(FakeRecognition.last?.lang).toBe('sr-RS')
+    await user.click(screen.getByRole('button', { name: /Start transcription/ }))
+    await screen.findByRole('button', { name: /Stop transcription/ })
+    expect(FakeRecognition.last?.lang).toBe('en-US')
 
     FakeRecognition.last!.say('Danas govorimo o zero trust arhitekturi.')
-    await waitFor(() => expect(published).toEqual([expect.objectContaining({ sequence: 0, text: 'Danas govorimo o zero trust arhitekturi.' })]))
+    // Published after a short settle pause (the browser may still extend the utterance).
+    await waitFor(() => expect(published).toEqual([expect.objectContaining({ sequence: 0, text: 'Danas govorimo o zero trust arhitekturi.' })]), {
+      timeout: 4000,
+    })
     expect(await screen.findByText('Danas govorimo o zero trust arhitekturi.', {}, { timeout: 4000 })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Zaustavi transkripciju/ }))
+    await user.click(screen.getByRole('button', { name: /Stop transcription/ }))
     await waitFor(() => expect(calls.some((c) => c.path === '/recordings/r1/stop')).toBe(true))
-    await screen.findByRole('button', { name: /Pokreni transkripciju/ })
+    await screen.findByRole('button', { name: /Start transcription/ })
   })
 })
 
@@ -98,15 +101,15 @@ describe('speakers are never asked for a CV', () => {
         : undefined,
   ]
 
-  it('joining goes straight to the talks, with no profile/CV card or Profil tab', async () => {
+  it('joining goes straight to the talks, with no profile/CV card or Profile tab', async () => {
     const { fn, calls } = fakeFetch(speakerRoutes)
     const user = userEvent.setup()
     renderAt('/events', makeServices(fn))
-    await user.click(await screen.findByRole('button', { name: 'Pridruži se' }))
+    await user.click(await screen.findByRole('button', { name: 'Join' }))
     expect(await screen.findByText('Zero trust')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/events/e1')
-    expect(screen.queryByText('Vaš profil')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Profil/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('Your profile')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Profile/ })).not.toBeInTheDocument()
     expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
   })
 
@@ -114,7 +117,7 @@ describe('speakers are never asked for a CV', () => {
     const { fn, calls } = fakeFetch(speakerRoutes)
     renderAt('/events/e1/cv', makeServices(fn))
     expect(await screen.findByText('Zero trust')).toBeInTheDocument()
-    expect(screen.queryByText('Želite li da dodate CV?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Would you like to add your CV?')).not.toBeInTheDocument()
     expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
   })
 })

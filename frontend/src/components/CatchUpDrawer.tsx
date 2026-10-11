@@ -6,10 +6,10 @@ import { useApi } from '../services'
 import { Button, Drawer, ErrorAlert, Notice } from './ui'
 
 const RANGES = [
-  { key: '30s', label: 'Posl. 30 s', ms: 30_000 },
-  { key: '1m', label: 'Posl. 1 min', ms: 60_000 },
-  { key: '3m', label: 'Posl. 3 min', ms: 180_000 },
-  { key: 'all', label: 'Od početka', ms: null },
+  { key: '30s', label: 'Last 30 s', ms: 30_000 },
+  { key: '1m', label: 'Last 1 min', ms: 60_000 },
+  { key: '3m', label: 'Last 3 min', ms: 180_000 },
+  { key: 'all', label: 'From the start', ms: null },
 ] as const
 
 export function catchUpRange(range: (typeof RANGES)[number]['key'], currentMs: number) {
@@ -41,10 +41,10 @@ export function CatchUpDrawer({
   const canAsk = !!recordingId && ready.length > 0
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} title="Izgubio sam nit" description="Kratak podsetnik šta je rečeno. Snimanje se nastavlja.">
-      {!canAsk && <Notice>Za sažetak je potreban transkript ovog predavanja. Pokrenite snimanje i sačekajte prve segmente.</Notice>}
+    <Drawer open={open} onOpenChange={onOpenChange} title="I lost the thread" description="A short reminder of what was said. The live transcript keeps running.">
+      {!canAsk && <Notice>A summary needs this talk’s transcript. Wait until the speaker starts and the first lines appear.</Notice>}
       <fieldset className="mt-2">
-        <legend className="mb-2 text-sm font-medium">Koji deo?</legend>
+        <legend className="mb-2 text-sm font-medium">Which part?</legend>
         <div className="grid grid-cols-2 gap-2">
           {RANGES.map((r) => (
             <label
@@ -58,7 +58,7 @@ export function CatchUpDrawer({
         </div>
       </fieldset>
       <Button className="mt-3 w-full" disabled={!canAsk || m.isPending} onClick={() => m.mutate(catchUpRange(range, currentMs))}>
-        {m.isPending ? 'Pravim sažetak…' : 'Sažmi'}
+        {m.isPending ? 'Summarizing…' : 'Summarize'}
       </Button>
       {m.isError && (
         <div className="mt-3">
@@ -74,7 +74,7 @@ export function CatchUpDrawer({
           <p className="leading-relaxed whitespace-pre-wrap">{m.data.summary}</p>
           {m.data.source_segment_ids.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium">Izvor u transkriptu</h3>
+              <h3 className="text-sm font-medium">Source in the transcript</h3>
               <ul className="mt-1 flex flex-wrap gap-2">
                 {m.data.source_segment_ids.map((id) => {
                   const seg = segments.find((s) => s.id === id)
@@ -89,7 +89,7 @@ export function CatchUpDrawer({
                           onJump(id)
                         }}
                       >
-                        {seg ? fmtMs(seg.start_ms) : 'segment nije učitan'}
+                        {seg ? fmtMs(seg.start_ms) : 'segment not loaded'}
                       </Button>
                     </li>
                   )

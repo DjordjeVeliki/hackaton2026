@@ -73,10 +73,10 @@ export class SpeakerTranscription {
     return ['starting', 'live', 'stopping'].includes(this.snap.status)
   }
 
-  async start(talkId: string, lang = 'sr-RS'): Promise<void> {
+  async start(talkId: string, lang = 'en-US'): Promise<void> {
     if (this.isActive) return
     if (!this.transcriber.supported) {
-      this.set({ ...IDLE, status: 'error', talkId, error: 'Ovaj pregledač ne podržava prepoznavanje govora. Koristite Chrome ili Edge.' })
+      this.set({ ...IDLE, status: 'error', talkId, error: 'This browser does not support speech recognition. Use Chrome or Edge.' })
       return
     }
     this.set({ ...IDLE, status: 'starting', talkId })
@@ -84,7 +84,7 @@ export class SpeakerTranscription {
     try {
       recordingId = (await this.api.startRecording(talkId)).recording_id
     } catch (e) {
-      this.set({ status: 'error', error: message(e, 'Transkripciju nije moguće pokrenuti.') })
+      this.set({ status: 'error', error: message(e, 'Could not start transcription.') })
       return
     }
     this.queue = []
@@ -117,7 +117,7 @@ export class SpeakerTranscription {
       await this.api.stopRecording(rid)
       this.set({ status: 'stopped' })
     } catch (e) {
-      this.set({ status: 'stopped', error: message(e, 'Server nije potvrdio zaustavljanje.') })
+      this.set({ status: 'stopped', error: message(e, 'The server did not confirm the stop.') })
     }
   }
 
@@ -144,10 +144,10 @@ export class SpeakerTranscription {
         if (e instanceof ApiError && !e.retryable) {
           // Rejected for good (e.g. not this talk's speaker): drop it, keep the sequence for the next one.
           this.queue.shift()
-          this.set({ pending: this.queue.length, error: message(e, 'Server je odbio deo transkripta.') })
+          this.set({ pending: this.queue.length, error: message(e, 'The server rejected part of the transcript.') })
           continue
         }
-        this.set({ error: 'Nema veze sa serverom — transkript čeka i biće poslat.' })
+        this.set({ error: 'No connection to the server — the transcript is queued and will be sent.' })
         await this.sleep(delay)
         delay = Math.min(delay * 2, 8000)
       }
