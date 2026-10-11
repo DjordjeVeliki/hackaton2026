@@ -7,7 +7,7 @@ from .. import blobs, firebase, tasks
 from ..ai_client import get_ai
 from ..auth import User, current_user, get_event, require_member
 from ..config import get_settings
-from ..errors import ApiError, bad_request
+from ..errors import ApiError, bad_request, forbidden
 from ..policy import has_known_baseline, norm_topic
 from ..schemas import (CvAccepted, EventItem, EventList, Interest, Joined, Me, ProfilePatch,
                        ProfilePublic, TalkItem, TalkList)
@@ -126,6 +126,9 @@ def patch_profile(event_id: str, body: ProfilePatch, user: User = Depends(curren
 @router.post("/events/{event_id}/cv", response_model=CvAccepted, status_code=202)
 def upload_cv(event_id: str, file: UploadFile, user: User = Depends(current_user)):
     require_member(event_id, user)
+    if "attendee" not in user.roles:
+        # Speakers, organizers and sponsors are never sponsor candidates, so they never upload a CV.
+        raise forbidden("Only attendees can upload a CV")
     s = get_settings()
     kind = CV_TYPES.get(file.content_type or "")
     data = file.file.read(s.max_cv_bytes + 1)

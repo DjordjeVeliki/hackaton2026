@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { hasRole, useMe, useProfile, useTalks } from '../api/hooks'
+import { isAttendee, useMe, useProfile, useTalks } from '../api/hooks'
 import type { TalkStatus } from '../api/types'
 import { ProfileStatus } from '../components/CvPanel'
 import { Badge, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
@@ -14,12 +14,12 @@ export function EventHomePage() {
   const { eventId = '' } = useParams()
   const talks = useTalks(eventId)
   const me = useMe()
-  const isSpeaker = hasRole(me.data?.roles, 'speaker')
-  const profile = useProfile(eventId, !isSpeaker && me.isSuccess)
+  const attendee = isAttendee(me.data?.roles)
+  const profile = useProfile(eventId, attendee)
 
   return (
     <div className="space-y-4">
-      {!isSpeaker && me.isSuccess && (
+      {attendee && (
       <Card
         title="Your profile"
         actions={

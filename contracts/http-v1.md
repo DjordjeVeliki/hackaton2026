@@ -23,7 +23,7 @@ GET /events -> {items:[{id,title}],next_cursor:string|null}
 POST /events/{event_id}/join -> {joined:true}
 GET /events/{event_id}/talks -> {items:[{id,title,speaker_name,status:"scheduled"|"live"|"ended"}]}
 GET /events/{event_id}/profile -> ProfilePublic
-POST /events/{event_id}/cv multipart {file} -> 202 {cv_status:"processing"}
+POST /events/{event_id}/cv multipart {file} -> 202 {cv_status:"processing"}; attendees only (403 FORBIDDEN for speaker/organizer/sponsor-only accounts)
 DELETE /events/{event_id}/cv -> ProfilePublic
 PATCH /events/{event_id}/profile -> body {declared_interests:string[]} -> ProfilePublic; no client-written privileged scores
 POST /talks/{talk_id}/recordings -> {recording_id:string,mode:"live"|"replay",started_at:string,sample_rate_hz:int,chunk_seconds:int}

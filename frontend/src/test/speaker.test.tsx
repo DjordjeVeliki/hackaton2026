@@ -121,3 +121,27 @@ describe('speakers are never asked for a CV', () => {
     expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
   })
 })
+
+describe('only attendees are asked for a CV', () => {
+  for (const roles of [['organizer'], ['sponsor']]) {
+    it(`${roles[0]}: no CV step, no profile card, no Profile tab, CV page redirects`, async () => {
+      const { fn, calls } = fakeFetch([
+        ({ path }) => (path === '/me' ? json(200, { user_id: 'x', display_name: 'X', roles }) : undefined),
+        ({ path }) => (path === '/events' ? json(200, { items: [{ id: 'e1', title: 'Conference' }], next_cursor: null }) : undefined),
+        ({ path }) => (path === '/events/e1/join' ? json(200, { joined: true }) : undefined),
+        ({ path }) => (path === '/events/e1/talks' ? json(200, { items: [{ id: 't1', title: 'Zero trust', speaker_name: 'S', status: 'scheduled' }] }) : undefined),
+      ])
+      const user = userEvent.setup()
+      renderAt('/events', makeServices(fn))
+      await user.click(await screen.findByRole('button', { name: 'Join' }))
+      expect(await screen.findByText('Zero trust')).toBeInTheDocument()
+      expect(window.location.pathname).toBe('/events/e1')
+      expect(screen.queryByText('Your profile')).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Profile/ })).not.toBeInTheDocument()
+      window.history.pushState({}, '', '/events/e1/cv')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      await waitFor(() => expect(window.location.pathname).toBe('/events/e1'))
+      expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
+    })
+  }
+})

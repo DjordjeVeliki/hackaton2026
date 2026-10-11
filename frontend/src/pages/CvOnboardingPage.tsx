@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { hasRole, useMe, useProfile } from '../api/hooks'
+import { isAttendee, useMe, useProfile } from '../api/hooks'
 import { CvPanel } from '../components/CvPanel'
 import { Card, ErrorAlert, Spinner } from '../components/ui'
 
@@ -7,10 +7,10 @@ import { Card, ErrorAlert, Spinner } from '../components/ui'
 export function CvOnboardingPage() {
   const { eventId = '' } = useParams()
   const me = useMe()
-  const isSpeaker = hasRole(me.data?.roles, 'speaker')
-  const profile = useProfile(eventId, !isSpeaker)
-  // Speakers are never asked for a CV.
-  if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
+  const attendee = isAttendee(me.data?.roles)
+  const profile = useProfile(eventId, attendee)
+  // CV is uploaded only by attendees; speakers, organizers and sponsors are sent to the talks.
+  if (me.isSuccess && !attendee) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h1 className="text-2xl font-bold">Would you like to add your CV?</h1>

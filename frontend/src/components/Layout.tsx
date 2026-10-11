@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense } from 'react'
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
-import { hasRole, useMe } from '../api/hooks'
+import { hasRole, isAttendee, useMe } from '../api/hooks'
 import { useServices } from '../services'
 import { useSpeakerTranscription } from './SpeakerLive'
 import { Button } from './ui'
@@ -31,7 +31,7 @@ export function Layout() {
         ...(hasRole(roles, 'speaker') ? [{ to: `/speaker/events/${eventId}`, label: 'Questions', icon: '💬' }] : []),
         ...(hasRole(roles, 'sponsor') ? [{ to: `/sponsor/events/${eventId}`, label: 'Sponsor', icon: '🤝' }] : []),
         ...(hasRole(roles, 'organizer') ? [{ to: `/organizer/events/${eventId}`, label: 'Organizer', icon: '📊' }] : []),
-        ...(hasRole(roles, 'speaker') ? [] : [{ to: `/events/${eventId}/profile`, label: 'Profile', icon: '👤' }]),
+        ...(isAttendee(roles) ? [{ to: `/events/${eventId}/profile`, label: 'Profile', icon: '👤' }] : []),
       ]
     : []
 

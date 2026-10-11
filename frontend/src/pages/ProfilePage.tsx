@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import { hasRole, qk, useMe, useProfile } from '../api/hooks'
+import { isAttendee, qk, useMe, useProfile } from '../api/hooks'
 import type { Consent, InterestSource, Opportunity, ProfilePublic } from '../api/types'
 import { Combobox } from '../components/Combobox'
 import { CvPanel } from '../components/CvPanel'
@@ -13,10 +13,10 @@ const SOURCE_LABEL: Record<InterestSource, string> = { cv: 'from CV', question: 
 export function ProfilePage() {
   const { eventId = '' } = useParams()
   const me = useMe()
-  const isSpeaker = hasRole(me.data?.roles, 'speaker')
-  const profile = useProfile(eventId, !isSpeaker)
-  // CV, interests and sponsor sharing are attendee features; speakers are never asked for a CV.
-  if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
+  const attendee = isAttendee(me.data?.roles)
+  const profile = useProfile(eventId, attendee)
+  // CV is uploaded only by attendees; speakers, organizers and sponsors are sent to the talks.
+  if (me.isSuccess && !attendee) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Profile</h1>

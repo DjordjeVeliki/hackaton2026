@@ -28,6 +28,11 @@ export function hasRole(roles: string[] | undefined, role: string) {
   return !!roles?.includes(role)
 }
 
+/** CV, interests and sponsor sharing are for attendees only (not speakers, organizers or sponsors). */
+export function isAttendee(roles: string[] | undefined) {
+  return hasRole(roles, 'attendee')
+}
+
 export function useTalks(eventId: string) {
   const api = useApi()
   return useQuery({ queryKey: qk.talks(eventId), queryFn: () => api.talks(eventId), refetchInterval: 30_000 })

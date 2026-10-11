@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { hasRole, qk, useMe } from '../api/hooks'
+import { isAttendee, qk, useMe } from '../api/hooks'
 import { Button, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
 import { useApi } from '../services'
 
@@ -8,8 +8,8 @@ export function EventsPage() {
   const api = useApi()
   const nav = useNavigate()
   const me = useMe()
-  // Speakers are not sponsor candidates: no CV step after joining.
-  const isSpeaker = hasRole(me.data?.roles, 'speaker')
+  // Only attendees get the optional CV step after joining.
+  const attendee = isAttendee(me.data?.roles)
   const events = useInfiniteQuery({
     queryKey: qk.events,
     queryFn: ({ pageParam }) => api.events(pageParam),
@@ -18,7 +18,7 @@ export function EventsPage() {
   })
   const join = useMutation({
     mutationFn: (eventId: string) => api.joinEvent(eventId),
-    onSuccess: (_d, eventId) => nav(isSpeaker ? `/events/${eventId}` : `/events/${eventId}/cv`),
+    onSuccess: (_d, eventId) => nav(attendee ? `/events/${eventId}/cv` : `/events/${eventId}`),
   })
 
   const items = events.data?.pages.flatMap((p) => p.items) ?? []
