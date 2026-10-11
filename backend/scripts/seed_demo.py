@@ -12,9 +12,9 @@ from firebase_admin import auth as fb_auth
 from app import firebase
 
 USERS = [
-    ("organizer", "Organizator", ["organizer"]),
-    ("speaker", "Govornik", ["speaker"]),
-    ("sponsor", "Sponzor Acme", ["sponsor"]),
+    ("organizer", "Organizer", ["organizer"]),
+    ("speaker", "Speaker", ["speaker"]),
+    ("sponsor", "Acme Sponsor", ["sponsor"]),
     ("attendee1", "Ana Petrović", ["attendee"]),
     ("attendee2", "Marko Jovanović", ["attendee"]),
 ]
@@ -42,16 +42,16 @@ def main() -> None:
     for uid, name, roles in USERS:
         ensure_user(uid, name, roles, a.password, a.domain)
     db.collection("events").document(a.event_id).set({
-        "title": "Cuevia Demo Konferencija", "topics": ["Machine Learning", "Cloud", "Security", "Data Engineering"],
-        "organizer_uids": ["organizer"], "locale": "sr"}, merge=True)
-    for tid, title, status in [("talk-ml", "Transformeri u praksi", "live"), ("talk-sec", "Zero trust", "scheduled")]:
+        "title": "Cuevia Demo Conference", "topics": ["Machine Learning", "Cloud", "Security", "Data Engineering"],
+        "organizer_uids": ["organizer"], "locale": "en"}, merge=True)
+    for tid, title, status in [("talk-ml", "Transformers in Practice", "live"), ("talk-sec", "Zero Trust", "scheduled")]:
         db.collection("talks").document(tid).set({
-            "event_id": a.event_id, "title": title, "speaker_name": "Govornik", "speaker_uids": ["speaker"],
+            "event_id": a.event_id, "title": title, "speaker_name": "Speaker", "speaker_uids": ["speaker"],
             "status": status}, merge=True)
     db.collection("recipients").document("acme").set(
         {"event_id": a.event_id, "kind": "sponsor", "name": "Acme", "member_uids": ["sponsor"]})
     db.collection("recipients").document("ml-group").set(
-        {"event_id": a.event_id, "kind": "group", "name": "ML zajednica", "member_uids": []})
+        {"event_id": a.event_id, "kind": "group", "name": "ML Community", "member_uids": []})
     for uid in ("organizer", "speaker"):
         db.collection("events").document(a.event_id).collection("members").document(uid).set(
             {"joined_at": firebase.now()})

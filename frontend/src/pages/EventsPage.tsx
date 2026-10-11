@@ -28,7 +28,10 @@ export function EventsPage() {
     onSuccess: (to) => nav(to),
   })
 
-  const items = events.data?.pages.flatMap((p) => p.items) ?? []
+  // Soonest first; events without a date go last.
+  const items = (events.data?.pages.flatMap((p) => p.items) ?? []).slice().sort(
+    (x, y) => (x.starts_at ? Date.parse(x.starts_at) : Infinity) - (y.starts_at ? Date.parse(y.starts_at) : Infinity),
+  )
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Events</h1>
