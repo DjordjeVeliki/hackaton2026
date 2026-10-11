@@ -75,6 +75,10 @@ def me(user: User = Depends(current_user)):
     return Me(user_id=user.uid, display_name=user.display_name, roles=list(user.roles))
 
 
+def _ts(value) -> str | None:
+    return firebase.rfc3339(value) if value else None
+
+
 @router.get("/events", response_model=EventList)
 def list_events(cursor: str | None = Query(default=None, max_length=128),
                 limit: int = Query(default=20, ge=1, le=50), user: User = Depends(current_user)):
@@ -82,7 +86,8 @@ def list_events(cursor: str | None = Query(default=None, max_length=128),
     if cursor:
         q = q.start_after(firebase.db().collection("events").document(cursor).get())
     docs = list(q.stream())
-    items = [EventItem(id=d.id, title=d.get("title")) for d in docs[:limit]]
+    items = [EventItem(id=d.id, title=d.get("title"), starts_at=_ts(d.to_dict().get("starts_at")),
+                       ends_at=_ts(d.to_dict().get("ends_at"))) for d in docs[:limit]]
     return EventList(items=items, next_cursor=items[-1].id if len(docs) > limit else None)
 
 

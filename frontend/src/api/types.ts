@@ -70,6 +70,9 @@ export interface Me {
 export interface EventSummary {
   id: string
   title: string
+  /** v1.1: conference start/end, RFC3339; null when not set. */
+  starts_at: string | null
+  ends_at: string | null
 }
 export interface Page<T> {
   items: T[]

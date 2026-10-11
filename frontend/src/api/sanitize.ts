@@ -39,7 +39,7 @@ function obj(v: unknown, what: string): Obj {
 }
 function str(o: Obj, k: string): string {
   const v = o[k]
-  if (typeof v !== 'string') throw new ContractError(`polje ${k} is not a string`)
+  if (typeof v !== 'string') throw new ContractError(`field ${k} is not a string`)
   return v
 }
 function strOrNull(o: Obj, k: string): string | null {
@@ -150,7 +150,7 @@ export function eventsPage(v: unknown): Page<EventSummary> {
   return {
     items: arr(o, 'items', (e) => {
       const x = obj(e, 'event')
-      return { id: str(x, 'id'), title: str(x, 'title') }
+      return { id: str(x, 'id'), title: str(x, 'title'), starts_at: strOrNull(x, 'starts_at'), ends_at: strOrNull(x, 'ends_at') }
     }),
     next_cursor: strOrNull(o, 'next_cursor'),
   }

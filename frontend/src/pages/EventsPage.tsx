@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { isAttendee, isSponsorOnly, qk, useMe } from '../api/hooks'
 import { Button, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
+import { fmtEventWhen } from '../lib/format'
 import { useApi } from '../services'
 
 export function EventsPage() {
@@ -39,7 +40,14 @@ export function EventsPage() {
           <li key={e.id}>
             <Card>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">{e.title}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold">{e.title}</h2>
+                  {e.starts_at && (
+                    <p className="text-sm text-slate-600">
+                      🗓 <time dateTime={e.starts_at}>{fmtEventWhen(e.starts_at, e.ends_at)}</time>
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <Button onClick={() => join.mutate(e.id)} disabled={join.isPending && join.variables === e.id}>
                     {join.isPending && join.variables === e.id ? 'Joining…' : 'Join'}

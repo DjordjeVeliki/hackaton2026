@@ -15,6 +15,19 @@ export function fmtClock(iso: string): string {
   return d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })
 }
 
+const DAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+/** Event date/time in the viewer's time zone: "Sun, 11 Oct 2026 · 09:00–18:00" (or a range across days). */
+export function fmtEventWhen(startsAt: string | null, endsAt: string | null): string {
+  const s = startsAt ? new Date(startsAt) : null
+  if (!s || Number.isNaN(s.getTime())) return ''
+  const e = endsAt ? new Date(endsAt) : null
+  if (!e || Number.isNaN(e.getTime())) return `${DAY.format(s)} · ${TIME.format(s)}`
+  if (DAY.format(s) === DAY.format(e)) return `${DAY.format(s)} · ${TIME.format(s)}–${TIME.format(e)}`
+  return `${DAY.format(s)} ${TIME.format(s)} – ${DAY.format(e)} ${TIME.format(e)}`
+}
+
 export function newRequestId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`

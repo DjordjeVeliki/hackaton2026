@@ -19,7 +19,7 @@ Explanation = {explanation:string,example:string,sources:Source[],retrieval_mode
 
 Routes:
 GET /me -> {user_id,display_name,roles:string[]}
-GET /events -> {items:[{id,title}],next_cursor:string|null}
+GET /events -> {items:[{id,title,starts_at:string|null,ends_at:string|null}],next_cursor:string|null}; starts_at/ends_at are v1.1 (RFC3339 UTC)
 POST /events/{event_id}/join -> {joined:true}
 GET /events/{event_id}/talks -> {items:[{id,title,speaker_name,status:"scheduled"|"live"|"ended"}]}
 GET /events/{event_id}/profile -> ProfilePublic

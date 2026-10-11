@@ -150,7 +150,7 @@ describe('sponsor accounts', () => {
   it('Join leads straight to candidates; no talks, no Talks tab', async () => {
     const { fn, calls } = fakeFetch([
       ({ path }) => (path === '/me' ? json(200, { user_id: 'sp1', display_name: 'Acme', roles: ['sponsor'] }) : undefined),
-      ({ path }) => (path === '/events' ? json(200, { items: [{ id: 'e1', title: 'Conference' }], next_cursor: null }) : undefined),
+      ({ path }) => (path === '/events' ? json(200, { items: [{ id: 'e1', title: 'Conference', starts_at: '2026-10-11T07:00:00Z', ends_at: '2026-10-11T16:00:00Z' }], next_cursor: null }) : undefined),
       ({ path }) => (path === '/events/e1/join' ? json(200, { joined: true }) : undefined),
       ({ path }) => (path === '/events/e1/opportunities' ? json(200, { items: [] }) : undefined),
       ({ path }) =>
@@ -166,6 +166,7 @@ describe('sponsor accounts', () => {
     const user = userEvent.setup()
     renderAt('/events', makeServices(fn))
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument()
+    expect(await screen.findByText(/Oct 2026 · \d{2}:\d{2}–\d{2}:\d{2}/)).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Join' }))
     expect(await screen.findByText('Jelena Nikolić')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/sponsor/events/e1')

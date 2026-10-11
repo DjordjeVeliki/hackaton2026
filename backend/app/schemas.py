@@ -77,6 +77,9 @@ class Me(Public):
 class EventItem(Public):
     id: str
     title: str
+    # v1.1: conference start/end (RFC3339 UTC); null when not set.
+    starts_at: str | None = None
+    ends_at: str | None = None
 
 
 class EventList(Public):
