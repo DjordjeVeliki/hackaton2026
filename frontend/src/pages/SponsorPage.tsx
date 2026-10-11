@@ -127,7 +127,11 @@ function RecommendationDetail({ eventId, rec }: { eventId: string; rec: Recommen
   })
   return (
     <article className="space-y-3 rounded-lg border border-slate-200 p-3" aria-label={`Details: ${rec.display_name}`}>
-      <h3 className="text-lg font-semibold">{rec.display_name}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold">{rec.display_name}</h3>
+        {/* The backend only returns people with a current consent for this sponsor. */}
+        <Badge tone="green">✓ Consented to share {rec.questions.length > 0 ? 'CV and questions' : 'CV'}</Badge>
+      </div>
       {rec.interests.length > 0 && (
         <ul className="flex flex-wrap gap-1">
           {rec.interests.map((i) => (
