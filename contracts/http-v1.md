@@ -28,11 +28,12 @@ DELETE /events/{event_id}/cv -> ProfilePublic
 PATCH /events/{event_id}/profile -> body {declared_interests:string[]} -> ProfilePublic; no client-written privileged scores
 POST /talks/{talk_id}/recordings -> {recording_id:string,mode:"live"|"replay",started_at:string,sample_rate_hz:int,chunk_seconds:int}
 POST /recordings/{recording_id}/chunks multipart {file,sequence,start_ms,end_ms} -> 202 {sequence:int,status:"accepted"}
-GET /recordings/{recording_id}/segments?after_sequence=-1&limit=50 -> {items:Segment[],next_after_sequence:int,processing_lag_ms:int}
+GET /recordings/{recording_id}/segments?after_sequence=-1&limit=50 -> {items:Segment[],next_after_sequence:int,processing_lag_ms:int,live_text:string}; live_text is v1.1 (speaker's in-progress words, "" if none)
 POST /recordings/{recording_id}/stop -> {status:"stopped"}
 POST /recordings/{recording_id}/catch-up body {start_ms:int,end_ms:int} -> CatchUp
 POST /recordings/{recording_id}/explanations body {selected_text:string,segment_id:string,depth:"simple"|"standard"|"advanced"} -> Explanation
 POST /recordings/{recording_id}/text-segments body {sequence:int,start_ms:int,end_ms:int,text:string} -> 202 {sequence:int,status:"accepted"}; v1.1, owner must be the talk's speaker or an organizer; sequences contiguous (409 SEQUENCE_GAP), idempotent per sequence
+PUT /recordings/{recording_id}/live body {text:string} -> {accepted:true}; v1.1, speaker/organizer owner only; in-memory, expires after 6 s, never stored
 GET /talks/{talk_id}/transcript -> {recording_id:string|null,status:"none"|"active"|"stopped"}; v1.1, event members; the talk's authoritative transcript recording
 GET /talks/{talk_id}/question-quota -> {used:int,limit:3,remaining:int}
 GET /talks/{talk_id}/questions -> {items:QuestionPublic[]} belonging to authenticated attendee

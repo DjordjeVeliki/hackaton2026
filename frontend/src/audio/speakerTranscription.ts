@@ -18,7 +18,11 @@ export interface SpeakerApi {
   startRecording(talkId: string): Promise<{ recording_id: string }>
   textSegment(recordingId: string, seg: { sequence: number; start_ms: number; end_ms: number; text: string }): Promise<unknown>
   stopRecording(recordingId: string): Promise<unknown>
+  /** v1.1, optional: words in progress, so attendees see speech before it is final. */
+  liveText?(recordingId: string, text: string): Promise<unknown>
 }
+
+const LIVE_THROTTLE_MS = 400
 
 export interface SpeakerDeps {
   api: SpeakerApi
@@ -47,6 +51,10 @@ export class SpeakerTranscription {
   private pumping: Promise<void> | null = null
   private offSegment: (() => void) | null = null
   private wakeLock: { release(): Promise<void> } | null = null
+  private offInterim: (() => void) | null = null
+  private liveSent = ''
+  private liveTimer: ReturnType<typeof setTimeout> | null = null
+  private liveInFlight = false
 
   constructor(deps: SpeakerDeps) {
     this.api = deps.api
@@ -93,6 +101,8 @@ export class SpeakerTranscription {
     this.transcriber.stop()
     this.transcriber.reset()
     this.offSegment = this.transcriber.onSegment((s) => this.enqueue(s))
+    this.liveSent = ''
+    this.offInterim = this.transcriber.subscribe(() => this.scheduleLive())
     this.transcriber.setLang(lang)
     this.transcriber.start(lang)
     if (this.transcriber.getSnapshot().status === 'error') {
@@ -110,6 +120,10 @@ export class SpeakerTranscription {
     this.transcriber.stop() // flushes the utterance in progress into the queue
     this.offSegment?.()
     this.offSegment = null
+    this.offInterim?.()
+    this.offInterim = null
+    if (this.liveTimer) clearTimeout(this.liveTimer)
+    this.liveTimer = null
     if (this.pumping) await Promise.race([this.pumping, this.sleep(10_000)])
     void this.wakeLock?.release().catch(() => undefined)
     this.wakeLock = null
@@ -152,6 +166,41 @@ export class SpeakerTranscription {
         delay = Math.min(delay * 2, 8000)
       }
     }
+  }
+
+  /** Push the interim text at most every LIVE_THROTTLE_MS; clearing it is sent right away. */
+  private scheduleLive() {
+    if (!this.api.liveText || this.snap.status !== 'live') return
+    const text = this.transcriber.getSnapshot().interim
+    if (text === this.liveSent) return
+    if (!text) {
+      if (this.liveTimer) clearTimeout(this.liveTimer)
+      this.liveTimer = null
+      void this.sendLive()
+      return
+    }
+    this.liveTimer ??= setTimeout(() => {
+      this.liveTimer = null
+      void this.sendLive()
+    }, LIVE_THROTTLE_MS)
+  }
+
+  private async sendLive() {
+    const rid = this.snap.recordingId
+    if (!rid || !this.api.liveText || this.liveInFlight) return
+    const text = this.transcriber.getSnapshot().interim
+    if (text === this.liveSent) return
+    this.liveInFlight = true
+    try {
+      await this.api.liveText(rid, text)
+      this.liveSent = text
+    } catch {
+      // best effort: the next update or the final segment covers it
+    } finally {
+      this.liveInFlight = false
+    }
+    // Text may have changed while the request was in flight.
+    if (this.transcriber.getSnapshot().interim !== this.liveSent) this.scheduleLive()
   }
 
   private async acquireWakeLock() {

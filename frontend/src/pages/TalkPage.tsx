@@ -68,7 +68,13 @@ export function TalkPage() {
       {transcript.isError && <ErrorAlert error={transcript.error} onRetry={() => transcript.refetch()} />}
 
       {recordingId ? (
-        <Transcript ref={transcriptRef} segments={segments} lagMs={transcript.data?.lagMs ?? 0} onSelectText={setSelection} />
+        <Transcript
+          ref={transcriptRef}
+          segments={segments}
+          lagMs={transcript.data?.lagMs ?? 0}
+          liveText={live ? (transcript.data?.liveText ?? '') : ''}
+          onSelectText={setSelection}
+        />
       ) : (
         source.isSuccess && (
           <Notice>

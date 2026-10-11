@@ -124,6 +124,17 @@ class SegmentPage(Public):
     items: list[Segment]
     next_after_sequence: int
     processing_lag_ms: int
+    # v1.1: words the speaker is saying right now (not final yet); "" when nothing is in progress.
+    live_text: str = ""
+
+
+class LiveTextIn(Public):
+    """v1.1: the speaker's in-progress (interim) recognition text. Ephemeral, never stored in Firestore."""
+    text: str = Field(default="", max_length=1000)
+
+
+class LiveAccepted(Public):
+    accepted: Literal[True] = True
 
 
 class Stopped(Public):

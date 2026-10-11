@@ -5,9 +5,11 @@ export interface TranscriptState {
   /** Value for the next `after_sequence` query parameter. */
   cursor: number
   lagMs: number
+  /** The speaker's words in progress (v1.1); replaced on every poll. */
+  liveText: string
 }
 
-export const EMPTY_TRANSCRIPT: TranscriptState = { segments: [], cursor: -1, lagMs: 0 }
+export const EMPTY_TRANSCRIPT: TranscriptState = { segments: [], cursor: -1, lagMs: 0, liveText: '' }
 
 /**
  * Append only unseen sequence numbers, keep order by sequence, never move the
@@ -22,9 +24,10 @@ export function mergeSegmentPage(prev: TranscriptState, page: SegmentPage): Tran
     fresh.push(s)
   }
   const cursor = Math.max(prev.cursor, page.next_after_sequence)
-  if (fresh.length === 0 && cursor === prev.cursor && page.processing_lag_ms === prev.lagMs) return prev
+  const liveText = page.live_text ?? ''
+  if (fresh.length === 0 && cursor === prev.cursor && page.processing_lag_ms === prev.lagMs && liveText === prev.liveText) return prev
   const segments = fresh.length ? [...prev.segments, ...fresh].sort((a, b) => a.sequence - b.sequence) : prev.segments
-  return { segments, cursor, lagMs: page.processing_lag_ms }
+  return { segments, cursor, lagMs: page.processing_lag_ms, liveText }
 }
 
 /** Ready segments overlapping [start_ms, end_ms]. */

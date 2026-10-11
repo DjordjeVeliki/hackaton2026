@@ -28,6 +28,7 @@ function setup(textSegment: (rid: string, seg: { sequence: number; text: string 
     startRecording: vi.fn(async () => ({ recording_id: 'r1' })),
     textSegment: vi.fn(textSegment),
     stopRecording: vi.fn(async () => ({ status: 'stopped' })),
+    liveText: vi.fn(async () => ({ accepted: true })),
   }
   const transcriber = new WebSpeechTranscriber({ ctor: Fake, now: () => 0, settleMs: 5 })
   const c = new SpeakerTranscription({ api, transcriber, sleep: async () => {} })
@@ -91,5 +92,18 @@ describe('SpeakerTranscription', () => {
     api.startRecording.mockRejectedValueOnce(new ApiError(403, 'FORBIDDEN', 'Join the event first', null))
     await c.start('t1')
     expect(c.getSnapshot()).toMatchObject({ status: 'error', error: 'Join the event first' })
+  })
+
+  it('pushes the words in progress (throttled) and clears them when the sentence is final', async () => {
+    const { api, c } = setup(async () => ({}))
+    await c.start('t1')
+    Fake.last.say('we are', false)
+    Fake.last.say('we are talking', false)
+    Fake.last.say('we are talking about indexes', false)
+    await vi.waitFor(() => expect(api.liveText).toHaveBeenCalledWith('r1', 'we are talking about indexes'))
+    expect(api.liveText.mock.calls.length).toBeLessThanOrEqual(2) // throttled, not one call per word
+    Fake.last.say('we are talking about indexes', true)
+    await vi.waitFor(() => expect(api.textSegment).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(api.liveText).toHaveBeenLastCalledWith('r1', ''))
   })
 })

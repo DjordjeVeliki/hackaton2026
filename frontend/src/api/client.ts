@@ -121,6 +121,9 @@ export class ApiClient {
   /** v1.1: publish text recognized on the speaker's device. */
   textSegment = (recordingId: string, seg: { sequence: number; start_ms: number; end_ms: number; text: string }) =>
     this.json('POST', `/recordings/${enc(recordingId)}/text-segments`, s.chunkAccepted, { json: seg })
+  /** v1.1: the speaker's words in progress, shown to attendees in near real time. */
+  liveText = (recordingId: string, text: string) =>
+    this.json('PUT', `/recordings/${enc(recordingId)}/live`, () => ({ accepted: true as const }), { json: { text } })
   /** v1.1: which recording is the talk's live transcript. */
   talkTranscript = (talkId: string) => this.json('GET', `/talks/${enc(talkId)}/transcript`, s.talkTranscript)
   segments = (recordingId: string, afterSequence: number, limit = 50) =>

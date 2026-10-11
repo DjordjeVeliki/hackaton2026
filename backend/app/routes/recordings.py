@@ -1,4 +1,5 @@
 import hashlib
+import time
 import uuid
 from datetime import timedelta
 
@@ -12,8 +13,8 @@ from ..auth import User, current_user, get_event, get_talk, is_member, require_m
 from ..config import get_settings
 from ..errors import ApiError, ai_unavailable, bad_request, forbidden, not_found
 from ..policy import norm_topic
-from ..schemas import (CatchUp, CatchUpRequest, ChunkAccepted, Explanation, ExplainRequest, RecordingStarted,
-                       Segment, SegmentPage, Stopped, TalkTranscript, TextSegmentIn)
+from ..schemas import (CatchUp, CatchUpRequest, ChunkAccepted, Explanation, ExplainRequest, LiveAccepted,
+                       LiveTextIn, RecordingStarted, Segment, SegmentPage, Stopped, TalkTranscript, TextSegmentIn)
 from .events import private_profile_ref
 
 router = APIRouter()
@@ -52,12 +53,20 @@ def is_talk_source(rec: dict) -> bool:
     return talk.exists and ((talk.to_dict().get("transcript_source") or {}).get("recording_id") == rec["id"])
 
 
+# Read access granted for (recording, user) is remembered briefly: polling every second would
+# otherwise cost 3 Firestore reads per request before the actual query.
+READ_GRANT_SECONDS = 30
+_read_grants: dict[tuple[str, str], tuple[dict, float]] = {}
+
+
 def readable_recording(recording_id: str, user: User) -> dict:
     """Owner, or any event member when the recording is the organizer-designated talk transcript."""
+    grant = _read_grants.get((recording_id, user.uid))
+    if grant and time.monotonic() - grant[1] < READ_GRANT_SECONDS:
+        return grant[0]
     rec = get_recording(recording_id)
-    if rec["owner_uid"] == user.uid:
-        return rec
-    if is_member(rec["event_id"], user.uid) and is_talk_source(rec):
+    if rec["owner_uid"] == user.uid or (is_member(rec["event_id"], user.uid) and is_talk_source(rec)):
+        _read_grants[(recording_id, user.uid)] = (rec, time.monotonic())
         return rec
     raise forbidden("Not your recording")
 
@@ -76,6 +85,13 @@ def processed_segments(recording_id: str) -> list[dict]:
 
 def _bump_stat(event_id: str, field: str) -> None:
     firebase.db().collection("event_stats").document(event_id).set({field: gcf.Increment(1)}, merge=True)
+
+
+# v1.1 live (interim) text: kept in process memory only, so it costs no Firestore writes.
+# Single-instance MVP; with several backend instances this would need a shared store.
+LIVE_TTL_SECONDS = 6
+_live_text: dict[str, tuple[str, float]] = {}
+_live_publishers: dict[str, str] = {}  # recording_id -> uid already authorized to publish
 
 
 def is_trusted_source(talk: dict, uid: str) -> bool:
@@ -221,12 +237,31 @@ def segments(recording_id: str, after_sequence: int = Query(default=-1, ge=-1),
             break
         items.append(Segment(**to_segment(recording_id, c)))
         expected += 1
-    return SegmentPage(items=items, next_after_sequence=expected - 1, processing_lag_ms=max(0, lag_ms))
+    live = _live_text.get(recording_id)
+    live_text = live[0] if live and time.monotonic() - live[1] < LIVE_TTL_SECONDS else ""
+    return SegmentPage(items=items, next_after_sequence=expected - 1, processing_lag_ms=max(0, lag_ms),
+                       live_text=live_text)
+
+
+@router.put("/recordings/{recording_id}/live", response_model=LiveAccepted)
+def put_live_text(recording_id: str, body: LiveTextIn, user: User = Depends(current_user)):
+    """v1.1: the speaker's in-progress words, shown to attendees in near real time (not part of the transcript)."""
+    if _live_publishers.get(recording_id) != user.uid:  # authorize once per recording, then skip Firestore reads
+        rec = owned_recording(recording_id, user)
+        if not is_trusted_source(get_talk(rec["talk_id"]), user.uid):
+            raise forbidden("Only the talk's speaker or an organizer can publish live text")
+        if rec["status"] != "active":
+            raise ApiError(409, "RECORDING_STOPPED", "Recording is stopped")
+        _live_publishers[recording_id] = user.uid
+    _live_text[recording_id] = (" ".join(body.text.split())[:1000], time.monotonic())
+    return LiveAccepted()
 
 
 @router.post("/recordings/{recording_id}/stop", response_model=Stopped)
 def stop(recording_id: str, user: User = Depends(current_user)):
     owned_recording(recording_id, user)
+    _live_text.pop(recording_id, None)
+    _live_publishers.pop(recording_id, None)
     rec_ref(recording_id).update({"status": "stopped", "stopped_at": firebase.now()})
     return Stopped()
 

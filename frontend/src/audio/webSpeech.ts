@@ -73,17 +73,30 @@ export interface WebSpeechDeps {
   settleMs?: number
 }
 
-/** Lower-case word list without punctuation, for comparing revisions of the same utterance. */
-function words(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s']/gu, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
+/** Words of an utterance: raw (as recognized) and normalized (for comparing revisions), aligned 1:1. */
+function tokens(text: string): { raw: string[]; norm: string[] } {
+  const raw: string[] = []
+  const norm: string[] = []
+  for (const tok of text.trim().split(/\s+/)) {
+    const n = tok.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '')
+    if (!n) continue
+    raw.push(tok)
+    norm.push(n)
+  }
+  return { raw, norm }
 }
 
-function isPrefix(a: string[], b: string[]): boolean {
-  return a.length <= b.length && a.every((w, i) => w === b[i])
+/**
+ * If `next` is a later revision of `prev` (same start; the recognizer may still have changed the
+ * last word or two, e.g. "...saying the" -> "...saying that you are..."), return how many words
+ * they share; otherwise -1 (a new utterance).
+ */
+export function continuation(prev: string[], next: string[]): number {
+  if (!prev.length || !next.length) return -1
+  let common = 0
+  while (common < prev.length && common < next.length && prev[common] === next[common]) common++
+  const slack = prev.length >= 8 ? 2 : prev.length >= 4 ? 1 : 0
+  return common > 0 && common >= prev.length - slack ? common : -1
 }
 
 /**
@@ -99,7 +112,9 @@ export class WebSpeechTranscriber {
   private startedAt = 0
   private utteranceStart: number | null = null
   /** Finalized text held back until it stops growing (Android re-sends growing finals). */
-  private held: { text: string; start: number; end: number } | null = null
+  private held: { text: string; base: number; start: number; end: number } | null = null
+  /** Raw interim (not final) text of the current recognition result. */
+  private interimText = ''
   private settleTimer: ReturnType<typeof setTimeout> | null = null
   private readonly settleMs: number
   /** Final text already handled at each result index of the current recognition session. */
@@ -114,7 +129,7 @@ export class WebSpeechTranscriber {
   constructor(deps: WebSpeechDeps = {}) {
     this.ctor = deps.ctor === undefined ? getSpeechRecognition() : deps.ctor
     this.now = deps.now ?? (() => performance.now())
-    this.settleMs = deps.settleMs ?? 1200
+    this.settleMs = deps.settleMs ?? 800
     this.snap = { status: this.ctor ? 'idle' : 'unsupported', lang: 'en-US', segments: [], interim: '', error: null }
   }
 
@@ -178,6 +193,7 @@ export class WebSpeechTranscriber {
     this.seq = 0
     this.lastPublished = []
     this.held = null
+    this.interimText = ''
     this.set({ status: this.ctor ? 'idle' : 'unsupported', segments: [], interim: '', error: null })
   }
 
@@ -219,57 +235,72 @@ export class WebSpeechTranscriber {
       }
     }
     if (interim && this.utteranceStart === null) this.utteranceStart = t
-    this.set({ interim: [this.held?.text, interim].filter(Boolean).join(' ') })
+    this.interimText = interim
+    this.refreshInterim()
+  }
+
+  /** What the speaker is saying that is not published yet: held tail + live interim, without repeats. */
+  private refreshInterim() {
+    const parts: string[] = []
+    if (this.held) parts.push(tokens(this.held.text).raw.slice(this.held.base).join(' '))
+    if (this.interimText) {
+      const it = tokens(this.interimText)
+      // Android interim text repeats the whole utterance; drop the part already held or published.
+      const ref = this.held ? tokens(this.held.text).norm : this.lastPublished
+      const c = continuation(ref, it.norm)
+      parts.push(c >= 0 ? it.raw.slice(Math.max(c, ref.length)).join(' ') : this.interimText)
+    }
+    this.set({ interim: parts.filter(Boolean).join(' ') })
   }
 
   /**
    * Chrome on Android (continuous mode) reports every growing version of an utterance as a new
-   * final result: "okay so", "okay so I'm", "okay so I'm speaking"... Hold the latest version and
-   * replace it while new finals merely extend or repeat it; publish once a different utterance
-   * starts or the speaker pauses.
+   * final result ("okay so", "okay so I'm", ...) and may revise its last words. Hold the newest
+   * version while finals keep continuing it; publish only words that were not published before,
+   * once a different utterance starts or the speaker pauses.
    */
   private acceptFinal(text: string, t: number) {
-    const w = words(text)
+    const w = tokens(text).norm
     if (!w.length) return
+    const ref = this.held ? tokens(this.held.text).norm : this.lastPublished
+    const c = continuation(ref, w)
+    // An exact re-send of (part of) the reference: same words, nothing new.
+    const exactRepeat = c === w.length && w.length <= ref.length
     if (this.held) {
-      const hw = words(this.held.text)
-      if (isPrefix(hw, w)) {
-        this.held = { ...this.held, text, end: t }
-      } else if (!isPrefix(w, hw)) {
+      if (c >= 0 && w.length >= ref.length) {
+        this.held = { ...this.held, text, end: t } // newer revision of the held utterance
+      } else if (!exactRepeat) {
         this.flushHeld()
-        this.held = { text, start: this.utteranceStart ?? t, end: t }
+        this.held = { text, base: 0, start: this.utteranceStart ?? t, end: t }
       }
-    } else if (isPrefix(w, this.lastPublished)) {
+    } else if (exactRepeat) {
       return // late repeat of something already published
-    } else if (this.lastPublished.length && isPrefix(this.lastPublished, w)) {
-      // Late extension of the published utterance: keep only the new words.
-      const extra = text.split(/\s+/).slice(this.lastPublished.length).join(' ')
-      this.held = { text: extra, start: t, end: t }
-      this.lastPublished = w
-      this.flushHeld(w)
-      return
+    } else if (c >= 0 && w.length > this.lastPublished.length) {
+      this.held = { text, base: this.lastPublished.length, start: t, end: t } // late continuation
     } else {
-      this.held = { text, start: this.utteranceStart ?? t, end: t }
+      this.held = { text, base: 0, start: this.utteranceStart ?? t, end: t }
     }
     this.utteranceStart = null
     if (this.settleTimer) clearTimeout(this.settleTimer)
     this.settleTimer = setTimeout(() => {
       this.settleTimer = null
       this.flushHeld()
-      this.set({ interim: this.snap.interim && !this.held ? this.snap.interim : '' })
+      this.refreshInterim()
     }, this.settleMs)
   }
 
-  private flushHeld(publishedWords?: string[]) {
+  private flushHeld() {
     if (this.settleTimer) {
       clearTimeout(this.settleTimer)
       this.settleTimer = null
     }
     const h = this.held
     this.held = null
-    if (!h || !h.text.trim()) return
-    this.lastPublished = publishedWords ?? words(h.text)
-    this.pushSegment(h.text, h.start, h.end)
+    if (!h) return
+    const tk = tokens(h.text)
+    this.lastPublished = tk.norm
+    const tail = tk.raw.slice(h.base).join(' ')
+    if (tail) this.pushSegment(tail, h.start, h.end)
   }
 
   private onError(e: SpeechErrorEvent) {
@@ -298,11 +329,10 @@ export class WebSpeechTranscriber {
   }
 
   private commitInterim() {
-    // snap.interim shows held text + live interim; the live part is whatever follows the held text.
-    const shown = this.snap.interim.trim()
-    const held = this.held?.text ?? ''
-    const live = held && shown.startsWith(held) ? shown.slice(held.length).trim() : shown
-    if (live) this.acceptFinal(held ? `${held} ${live}` : live, this.now() - this.startedAt)
+    // The recognizer stopped mid-utterance: treat the interim text as final (same merge rules).
+    const text = this.interimText
+    this.interimText = ''
+    if (text) this.acceptFinal(text, this.now() - this.startedAt)
     this.set({ interim: '' })
   }
 

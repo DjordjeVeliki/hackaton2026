@@ -23,8 +23,8 @@ const prefersReducedMotion = () =>
  */
 export const Transcript = forwardRef<
   TranscriptHandle,
-  { segments: Segment[]; onSelectText: (s: TextSelection | null) => void; lagMs: number }
->(function Transcript({ segments, onSelectText, lagMs }, ref) {
+  { segments: Segment[]; onSelectText: (s: TextSelection | null) => void; lagMs: number; liveText?: string }
+>(function Transcript({ segments, onSelectText, lagMs, liveText = '' }, ref) {
   const scroller = useRef<HTMLDivElement>(null)
   const [followLive, setFollowLive] = useState(true)
   const [viewIndex, setViewIndex] = useState(0)
@@ -52,9 +52,14 @@ export const Transcript = forwardRef<
     },
   }))
 
+  // Hide the in-progress line when it is already the end of the last final line (no visible repeat).
+  const lastText = [...segments].reverse().find((s) => s.status === 'ready')?.text ?? ''
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim()
+  const live = liveText && !norm(lastText).endsWith(norm(liveText)) ? liveText : ''
+
   useEffect(() => {
     if (followLive && scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight
-  }, [segments.length, followLive])
+  }, [segments.length, live, followLive])
 
   const onScroll = () => {
     const el = scroller.current
@@ -124,6 +129,12 @@ export const Transcript = forwardRef<
             ),
           )}
         </ol>
+        {live && (
+          <p className="mt-3 grid grid-cols-[3.5rem_1fr] gap-2 text-lg leading-relaxed text-slate-500 italic" aria-hidden="true">
+            <span className="pt-1 text-xs not-italic">● live</span>
+            <span>{live}…</span>
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 p-3">
         <Slider.Root

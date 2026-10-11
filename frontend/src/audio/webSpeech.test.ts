@@ -163,4 +163,56 @@ describe('WebSpeechTranscriber', () => {
     rec().emit([['we use vector indexes', true], ['we use vector indexes for search', true]], 1)
     await vi.waitFor(() => expect(published).toEqual(['we use vector indexes', 'for search']))
   })
+
+  it('the reported Android case: a revised word does not duplicate the sentence', async () => {
+    const { t, rec } = setup()
+    const published: string[] = []
+    t.onSegment((s) => published.push(s.text))
+    t.start('en-US')
+    rec().emit([["hey guys sorry for being late and I'll just start by saying the", true]], 0)
+    await vi.waitFor(() => expect(published).toHaveLength(1))
+    // Seconds later the recognizer re-sends the whole utterance, with "the" revised to "that".
+    rec().emit(
+      [
+        ["hey guys sorry for being late and I'll just start by saying the", true],
+        ["hey guys sorry for being late and I'll just start by saying that you are all welcome here and we should administer all those", true],
+      ],
+      1,
+    )
+    rec().emit(
+      [
+        ["hey guys sorry for being late and I'll just start by saying the", true],
+        ["hey guys sorry for being late and I'll just start by saying that you are all welcome here and we should administer all those", true],
+        ['in favor of', true],
+      ],
+      2,
+    )
+    await vi.waitFor(() =>
+      expect(published).toEqual([
+        "hey guys sorry for being late and I'll just start by saying the",
+        'you are all welcome here and we should administer all those',
+        'in favor of',
+      ]),
+    )
+  })
+
+  it('interim text shows only the words not yet published', async () => {
+    const { t, rec } = setup()
+    t.start('en-US')
+    rec().emit([['we use vector indexes', true]])
+    await vi.waitFor(() => expect(t.getSnapshot().segments).toHaveLength(1))
+    rec().emit([['we use vector indexes for fast', false]], 0)
+    expect(t.getSnapshot().interim).toBe('for fast')
+  })
+
+  it('two different short sentences with the same start are both kept', async () => {
+    const { t, rec } = setup()
+    const published: string[] = []
+    t.onSegment((s) => published.push(s.text))
+    t.start()
+    rec().emit([['I think that works', true]])
+    await vi.waitFor(() => expect(published).toHaveLength(1))
+    rec().emit([['I think that works', true], ['I think that fails', true]], 1)
+    await vi.waitFor(() => expect(published).toEqual(['I think that works', 'I think that fails']))
+  })
 })

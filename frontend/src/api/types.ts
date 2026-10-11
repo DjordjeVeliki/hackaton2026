@@ -108,6 +108,8 @@ export interface SegmentPage {
   items: Segment[]
   next_after_sequence: number
   processing_lag_ms: number
+  /** v1.1: the speaker's words in progress (not final yet). */
+  live_text?: string
 }
 
 export interface Quota {

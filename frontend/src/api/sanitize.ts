@@ -199,6 +199,8 @@ export function segmentPage(v: unknown): SegmentPage {
     items: arr(o, 'items', segment),
     next_after_sequence: int(o, 'next_after_sequence'),
     processing_lag_ms: int(o, 'processing_lag_ms'),
+    // v1.1, optional: older servers omit it.
+    live_text: typeof o.live_text === 'string' ? o.live_text.slice(0, 1000) : '',
   }
 }
 

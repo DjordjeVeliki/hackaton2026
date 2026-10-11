@@ -81,7 +81,8 @@ export function useTranscript(recordingId: string | null, poll: boolean) {
       }
       return state
     },
-    refetchInterval: (q) => (poll || (q.state.data?.lagMs ?? 0) > 0 ? 2000 : false),
+    // 1 s while the talk is live so attendees see the speaker's words with little delay.
+    refetchInterval: (q) => (poll ? 1000 : (q.state.data?.lagMs ?? 0) > 0 ? 2000 : false),
     refetchIntervalInBackground: true,
     staleTime: Infinity,
     gcTime: Infinity,

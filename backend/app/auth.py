@@ -42,6 +42,11 @@ class _RateLimiter:
 
 rate_limiter = _RateLimiter()
 
+# Roles change only through trusted scripts; a short cache saves a Firestore read on every request
+# (latency and the free-tier read quota, since clients poll every second during a live talk).
+USER_CACHE_SECONDS = 60
+_user_cache: dict[str, tuple[dict, float]] = {}
+
 
 def current_user(authorization: str = Header(default="")) -> User:
     scheme, _, token = authorization.partition(" ")
@@ -53,8 +58,13 @@ def current_user(authorization: str = Header(default="")) -> User:
         raise ApiError(401, "UNAUTHENTICATED", "Invalid or expired token") from None
     uid = claims["uid"]
     rate_limiter.check(uid, get_settings().rate_limit_per_minute)
-    snap = firebase.db().collection("users").document(uid).get()
-    data = snap.to_dict() if snap.exists else {}
+    cached = _user_cache.get(uid)
+    if cached and time.monotonic() - cached[1] < USER_CACHE_SECONDS:
+        data = cached[0]
+    else:
+        snap = firebase.db().collection("users").document(uid).get()
+        data = snap.to_dict() if snap.exists else {}
+        _user_cache[uid] = (data, time.monotonic())
     name = data.get("display_name") or claims.get("name") or claims.get("email") or uid
     roles = tuple(data.get("roles") or ["attendee"])
     return User(uid=uid, display_name=name, roles=roles)
