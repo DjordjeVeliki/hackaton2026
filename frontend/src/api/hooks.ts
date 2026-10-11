@@ -28,14 +28,19 @@ export function hasRole(roles: string[] | undefined, role: string) {
   return !!roles?.includes(role)
 }
 
+/** A sponsor account that does not also attend, speak or organize: sees candidates, not talks. */
+export function isSponsorOnly(roles: string[] | undefined) {
+  return hasRole(roles, 'sponsor') && !['attendee', 'speaker', 'organizer'].some((r) => hasRole(roles, r))
+}
+
 /** CV, interests and sponsor sharing are for attendees only (not speakers, organizers or sponsors). */
 export function isAttendee(roles: string[] | undefined) {
   return hasRole(roles, 'attendee')
 }
 
-export function useTalks(eventId: string) {
+export function useTalks(eventId: string, enabled = true) {
   const api = useApi()
-  return useQuery({ queryKey: qk.talks(eventId), queryFn: () => api.talks(eventId), refetchInterval: 30_000 })
+  return useQuery({ queryKey: qk.talks(eventId), queryFn: () => api.talks(eventId), refetchInterval: 30_000, enabled })
 }
 
 const CV_PENDING: CvStatus[] = ['uploaded', 'processing']

@@ -205,7 +205,12 @@ describe('interests combobox', () => {
     const box = await screen.findByRole('combobox', { name: 'Add an interest' })
     await user.click(box)
     const list = screen.getByRole('listbox')
-    expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Vector databases', 'Kubernetes', 'Search latency'])
+    const options = within(list).getAllByRole('option').map((o) => o.textContent)
+    // CV and question topics first, then the built-in examples (no case-insensitive duplicates).
+    expect(options.slice(0, 3)).toEqual(['Vector databases', 'Kubernetes', 'Search latency'])
+    expect(options).toContain('Large Language Models')
+    expect(options.filter((o) => o?.toLowerCase() === 'vector databases')).toHaveLength(1)
+    expect(options.length).toBeGreaterThanOrEqual(30)
     await user.type(box, 'vec')
     expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Vector databases', 'Add “vec”'])
     await user.keyboard('{Enter}')

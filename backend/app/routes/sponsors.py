@@ -75,7 +75,7 @@ def put_consent(event_id: str, recipient_id: str, body: ConsentBody, user: User 
 
 def _display_name(uid: str) -> str:
     snap = firebase.db().collection("users").document(uid).get()
-    return (snap.to_dict() or {}).get("display_name") or "Učesnik"
+    return (snap.to_dict() or {}).get("display_name") or "Attendee"
 
 
 @router.get("/sponsor/events/{event_id}/recommendations", response_model=RecommendationList)

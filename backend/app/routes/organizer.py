@@ -36,7 +36,7 @@ def set_transcript_source(talk_id: str, body: TranscriptSourceBody, user: User =
 
 
 def _deterministic_reasons(relevant_topics: list[str]) -> list[str]:
-    return [f"CV pokriva temu: {t}" for t in relevant_topics]
+    return [f"CV covers: {t}" for t in relevant_topics]
 
 
 @router.post("/organizer/events/{event_id}/finalize-shortlists", response_model=Finalized)

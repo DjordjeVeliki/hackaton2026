@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { isAttendee, qk, useMe } from '../api/hooks'
+import { isAttendee, isSponsorOnly, qk, useMe } from '../api/hooks'
 import { Button, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
 import { useApi } from '../services'
 
@@ -8,8 +8,7 @@ export function EventsPage() {
   const api = useApi()
   const nav = useNavigate()
   const me = useMe()
-  // Only attendees get the optional CV step after joining.
-  const attendee = isAttendee(me.data?.roles)
+  const roles = me.data?.roles
   const events = useInfiniteQuery({
     queryKey: qk.events,
     queryFn: ({ pageParam }) => api.events(pageParam),
@@ -17,8 +16,15 @@ export function EventsPage() {
     getNextPageParam: (last) => last.next_cursor,
   })
   const join = useMutation({
-    mutationFn: (eventId: string) => api.joinEvent(eventId),
-    onSuccess: (_d, eventId) => nav(attendee ? `/events/${eventId}/cv` : `/events/${eventId}`),
+    // Joining is idempotent, so the one button also re-opens an event you already joined.
+    mutationFn: async (eventId: string) => {
+      await api.joinEvent(eventId)
+      if (isSponsorOnly(roles)) return `/sponsor/events/${eventId}`
+      // Only attendees get the optional CV step, and only while they have no CV yet.
+      if (isAttendee(roles) && (await api.profile(eventId)).cv_status === 'missing') return `/events/${eventId}/cv`
+      return `/events/${eventId}`
+    },
+    onSuccess: (to) => nav(to),
   })
 
   const items = events.data?.pages.flatMap((p) => p.items) ?? []
@@ -35,9 +41,6 @@ export function EventsPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">{e.title}</h2>
                 <div className="flex gap-2">
-                  <Button variant="secondary" onClick={() => nav(`/events/${e.id}`)}>
-                    Open
-                  </Button>
                   <Button onClick={() => join.mutate(e.id)} disabled={join.isPending && join.variables === e.id}>
                     {join.isPending && join.variables === e.id ? 'Joining…' : 'Join'}
                   </Button>

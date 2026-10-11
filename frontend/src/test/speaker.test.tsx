@@ -123,7 +123,7 @@ describe('speakers are never asked for a CV', () => {
 })
 
 describe('only attendees are asked for a CV', () => {
-  for (const roles of [['organizer'], ['sponsor']]) {
+  for (const roles of [['organizer']]) {
     it(`${roles[0]}: no CV step, no profile card, no Profile tab, CV page redirects`, async () => {
       const { fn, calls } = fakeFetch([
         ({ path }) => (path === '/me' ? json(200, { user_id: 'x', display_name: 'X', roles }) : undefined),
@@ -144,4 +144,33 @@ describe('only attendees are asked for a CV', () => {
       expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
     })
   }
+})
+
+describe('sponsor accounts', () => {
+  it('Join leads straight to candidates; no talks, no Talks tab', async () => {
+    const { fn, calls } = fakeFetch([
+      ({ path }) => (path === '/me' ? json(200, { user_id: 'sp1', display_name: 'Acme', roles: ['sponsor'] }) : undefined),
+      ({ path }) => (path === '/events' ? json(200, { items: [{ id: 'e1', title: 'Conference' }], next_cursor: null }) : undefined),
+      ({ path }) => (path === '/events/e1/join' ? json(200, { joined: true }) : undefined),
+      ({ path }) => (path === '/events/e1/opportunities' ? json(200, { items: [] }) : undefined),
+      ({ path }) =>
+        path === '/sponsor/events/e1/recommendations'
+          ? json(200, {
+              items: [
+                { participant_id: 'a1', display_name: 'Jelena Nikolić', interests: [{ topic: 'Machine Learning', source: 'cv' }],
+                  reasons: ['Built ML pipelines in production.'], questions: [], cv_available: true },
+              ],
+            })
+          : undefined,
+    ])
+    const user = userEvent.setup()
+    renderAt('/events', makeServices(fn))
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Join' }))
+    expect(await screen.findByText('Jelena Nikolić')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/sponsor/events/e1')
+    expect(screen.getByRole('button', { name: 'Download CV' })).toBeEnabled()
+    expect(screen.queryByRole('link', { name: /Talks/ })).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/events/e1/talks')).toBe(false)
+  })
 })

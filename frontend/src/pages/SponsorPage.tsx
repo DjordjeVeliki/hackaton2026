@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { qk } from '../api/hooks'
 import type { Recommendation } from '../api/types'
-import { Badge, Button, Card, EmptyState, ErrorAlert, Field, inputClass, Notice, Spinner } from '../components/ui'
+import { Badge, Button, EmptyState, ErrorAlert, Field, inputClass, Spinner } from '../components/ui'
 import { fmtClock } from '../lib/format'
 import { useApi } from '../services'
 
@@ -17,59 +17,54 @@ export function SponsorPage() {
   const { eventId = '' } = useParams()
   const api = useApi()
   const opps = useQuery({ queryKey: qk.opportunities(eventId), queryFn: () => api.opportunities(eventId) })
-  const recs = useQuery({ queryKey: qk.recommendations(eventId), queryFn: () => api.recommendations(eventId) })
-  const [selected, setSelected] = useState<string | null>(null)
-  const current = recs.data?.find((r) => r.participant_id === selected) ?? null
+  // Refreshes on its own so candidates appear as soon as the organizer approves the lists.
+  const recs = useQuery({ queryKey: qk.recommendations(eventId), queryFn: () => api.recommendations(eventId), refetchInterval: 15_000 })
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Sponsor / group</h1>
-      <Card title="Opportunities">
-        {opps.isPending && <Spinner />}
-        {opps.isError && <ErrorAlert error={opps.error} onRetry={() => opps.refetch()} />}
-        {opps.data?.length === 0 && <EmptyState>No opportunities yet.</EmptyState>}
-        <ul className="space-y-2">
-          {opps.data?.map((o) => (
-            <li key={o.id} className="rounded-lg border border-slate-200 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{o.title}</span>
-                <Badge tone="blue">{o.recipient_kind === 'sponsor' ? 'Sponsor' : 'Group'}</Badge>
-              </div>
-              {o.topics.length > 0 && <p className="text-sm text-slate-600">{o.topics.join(', ')}</p>}
+      <div>
+        <h1 className="text-2xl font-bold">Your top candidates</h1>
+        <p className="text-slate-600">
+          Up to five attendees per opportunity, ranked from their CV and the questions they asked during the conference. Only people
+          who consented are shown. Recommendations are advisory — you decide whom to contact.
+        </p>
+      </div>
+
+      {recs.isPending && <Spinner />}
+      {recs.isError && <ErrorAlert error={recs.error} onRetry={() => recs.refetch()} />}
+      {recs.data?.length === 0 && (
+        <EmptyState>No candidates yet. They appear here as soon as the organizer approves the lists.</EmptyState>
+      )}
+      {recs.data && recs.data.length > 0 && (
+        <ol className="space-y-3" aria-label="Recommended candidates">
+          {recs.data.map((r) => (
+            <li key={r.participant_id}>
+              <RecommendationDetail eventId={eventId} rec={r} />
             </li>
           ))}
-        </ul>
-        <NewOpportunity eventId={eventId} />
-      </Card>
+        </ol>
+      )}
 
-      <Card title="Recommended attendees">
-        <Notice>
-          Up to five attendees per opportunity, only those who consented, after the organizer finalizes the lists. Recommendations are advisory — you decide whom to contact.
-        </Notice>
+      <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer font-semibold">Your opportunities ({opps.data?.length ?? 0})</summary>
         <div className="mt-3">
-          {recs.isPending && <Spinner />}
-          {recs.isError && <ErrorAlert error={recs.error} onRetry={() => recs.refetch()} />}
-          {recs.data?.length === 0 && <EmptyState>No recommendations yet (lists may not be finalized).</EmptyState>}
-        </div>
-        <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <ul className="space-y-2" aria-label="Recommendations">
-            {recs.data?.map((r) => (
-              <li key={r.participant_id}>
-                <button
-                  type="button"
-                  aria-pressed={selected === r.participant_id}
-                  onClick={() => setSelected(r.participant_id)}
-                  className={`w-full rounded-lg border p-3 text-left ${selected === r.participant_id ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'}`}
-                >
-                  <span className="font-medium">{r.display_name}</span>
-                  <span className="block text-sm text-slate-600">{r.interests.map((i) => i.topic).slice(0, 4).join(', ')}</span>
-                </button>
+          {opps.isPending && <Spinner />}
+          {opps.isError && <ErrorAlert error={opps.error} onRetry={() => opps.refetch()} />}
+          {opps.data?.length === 0 && <EmptyState>No opportunities yet. Post one so candidates can be matched to it.</EmptyState>}
+          <ul className="space-y-2">
+            {opps.data?.map((o) => (
+              <li key={o.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{o.title}</span>
+                  <Badge tone="blue">{o.recipient_kind === 'sponsor' ? 'Sponsor' : 'Group'}</Badge>
+                </div>
+                {o.topics.length > 0 && <p className="text-sm text-slate-600">{o.topics.join(', ')}</p>}
               </li>
             ))}
           </ul>
-          {current && <RecommendationDetail eventId={eventId} rec={current} />}
+          <NewOpportunity eventId={eventId} />
         </div>
-      </Card>
+      </details>
     </div>
   )
 }

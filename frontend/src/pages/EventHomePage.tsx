@@ -1,5 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
-import { isAttendee, useMe, useProfile, useTalks } from '../api/hooks'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import { isAttendee, isSponsorOnly, useMe, useProfile, useTalks } from '../api/hooks'
 import type { TalkStatus } from '../api/types'
 import { ProfileStatus } from '../components/CvPanel'
 import { Badge, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
@@ -12,10 +12,14 @@ const TALK_STATUS: Record<TalkStatus, { text: string; tone: 'green' | 'slate' | 
 
 export function EventHomePage() {
   const { eventId = '' } = useParams()
-  const talks = useTalks(eventId)
   const me = useMe()
+  const sponsorOnly = isSponsorOnly(me.data?.roles)
+  const talks = useTalks(eventId, me.isSuccess && !sponsorOnly)
   const attendee = isAttendee(me.data?.roles)
   const profile = useProfile(eventId, attendee)
+
+  // Sponsors join the event but never see talks: their page is the candidate list.
+  if (sponsorOnly) return <Navigate to={`/sponsor/events/${eventId}`} replace />
 
   return (
     <div className="space-y-4">

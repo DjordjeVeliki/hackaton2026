@@ -4,6 +4,7 @@ import { Navigate, useParams } from 'react-router-dom'
 import { isAttendee, qk, useMe, useProfile } from '../api/hooks'
 import type { Consent, InterestSource, Opportunity, ProfilePublic } from '../api/types'
 import { Combobox } from '../components/Combobox'
+import { interestOptions } from '../lib/interests'
 import { CvPanel } from '../components/CvPanel'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Notice, Spinner } from '../components/ui'
 import { useApi } from '../services'
@@ -52,8 +53,9 @@ function Interests({ eventId, profile }: { eventId: string; profile: ProfilePubl
     save.mutate([...declared, topic])
   }
   const derived = profile.interests.filter((i) => i.source !== 'declared')
-  // Suggestions: topics found in your CV first, then topics from your questions.
-  const suggestions = [...derived.filter((i) => i.source === 'cv'), ...derived.filter((i) => i.source === 'question')].map((i) => i.topic)
+  // Suggestions: topics found in your CV, then from your questions, then built-in examples.
+  const fromProfile = [...derived.filter((i) => i.source === 'cv'), ...derived.filter((i) => i.source === 'question')].map((i) => i.topic)
+  const suggestions = interestOptions(fromProfile, declared)
 
   return (
     <div className="space-y-3">
@@ -93,7 +95,7 @@ function Interests({ eventId, profile }: { eventId: string; profile: ProfilePubl
         options={suggestions}
         onSelect={add}
         disabled={save.isPending}
-        placeholder={suggestions.length ? 'Pick from your CV topics or type your own' : 'Type a topic'}
+        placeholder={fromProfile.length ? 'Pick a topic from your CV or the list, or type your own' : 'Pick a topic or type your own'}
       />
       {save.isError && <ErrorAlert error={save.error} />}
     </div>
