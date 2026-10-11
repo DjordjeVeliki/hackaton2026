@@ -1,11 +1,11 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
-  getAuth,
-  GoogleAuthProvider,
+  indexedDBLocalPersistence,
+  initializeAuth,
   onIdTokenChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   updateProfile,
   type Auth,
@@ -23,7 +23,9 @@ export function createFirebaseAuth(cfg: AppConfig): AuthBackend {
     )
   }
   const app: FirebaseApp = initializeApp(f)
-  const auth: Auth = getAuth(app)
+  // initializeAuth without a popupRedirectResolver keeps the popup/iframe code out of the
+  // initial mobile bundle; it is loaded only when Google sign-in is actually used.
+  const auth: Auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] })
   const toUser = (u: { uid: string; email: string | null; displayName: string | null } | null): AuthUser | null =>
     u ? { uid: u.uid, email: u.email, displayName: u.displayName } : null
 
@@ -44,7 +46,8 @@ export function createFirebaseAuth(cfg: AppConfig): AuthBackend {
     },
     async signInWithGoogle() {
       if (!cfg.googleSignIn) throw new Error('Google prijava nije omogućena.')
-      await signInWithPopup(auth, new GoogleAuthProvider())
+      const { googleSignIn } = await import('./googleSignIn')
+      await googleSignIn(auth)
     },
     async signOut() {
       await signOut(auth)

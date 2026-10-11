@@ -130,6 +130,20 @@ class Stopped(Public):
     status: Literal["stopped"] = "stopped"
 
 
+class TextSegmentIn(Public):
+    """v1.1: finalized text recognized on the speaker's device (browser speech recognition)."""
+    sequence: int = Field(ge=0, le=100_000)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    text: str = Field(min_length=1, max_length=5000)
+
+
+class TalkTranscript(Public):
+    """v1.1: the talk's authoritative transcript recording, if one exists."""
+    recording_id: str | None
+    status: Literal["none", "active", "stopped"]
+
+
 class CatchUpRequest(Public):
     start_ms: int = Field(ge=0)
     end_ms: int = Field(ge=0)

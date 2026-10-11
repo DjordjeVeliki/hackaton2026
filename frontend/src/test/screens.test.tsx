@@ -11,6 +11,18 @@ const base: Route[] = [
 const profileRoute = (p: Record<string, unknown>): Route => ({ path }) =>
   path === '/events/e1/profile' ? json(200, p) : undefined
 
+const liveTalk: Route[] = [
+  ({ path }) => (path === '/talks/t1/transcript' ? json(200, { recording_id: 'r1', status: 'active' }) : undefined),
+  ({ path }) =>
+    path.startsWith('/recordings/r1/segments')
+      ? json(200, {
+          items: [{ id: 's0', sequence: 0, start_ms: 0, end_ms: 4000, text: 'Govornik objašnjava HNSW indekse.', status: 'ready' }],
+          next_after_sequence: 0,
+          processing_lag_ms: 0,
+        })
+      : undefined,
+]
+
 const PROFILE_NA = { user_id: 'u1', cv_status: 'missing', expertise_status: 'N/A', interests: [], eligible_for_top5: false }
 
 describe('CV states and N/A availability', () => {
@@ -31,11 +43,21 @@ describe('CV states and N/A availability', () => {
   })
 
   it('attendee without CV can use transcript, catch-up, explanations and questions', async () => {
-    const { fn } = fakeFetch([...base, profileRoute(PROFILE_NA)])
+    const { fn } = fakeFetch([...base, profileRoute(PROFILE_NA), ...liveTalk])
     renderAt('/events/e1/talks/t1', makeServices(fn))
-    expect(await screen.findByRole('button', { name: /Pokreni transkripciju/ })).toBeEnabled()
+    expect(await screen.findByText('Govornik objašnjava HNSW indekse.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Izgubio sam nit/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Objasni pojam' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Postavi pitanje' })).toBeEnabled()
+    // Only the speaker starts transcription; attendees never get a recording control.
+    expect(screen.queryByRole('button', { name: /Pokreni transkripciju/ })).not.toBeInTheDocument()
+  })
+
+  it('before the speaker starts, attendees are told the transcript will appear', async () => {
+    const { fn } = fakeFetch([...base, ({ path }) => (path === '/talks/t1/transcript' ? json(200, { recording_id: null, status: 'none' }) : undefined)])
+    renderAt('/events/e1/talks/t1', makeServices(fn))
+    expect(await screen.findByText(/pojaviti automatski čim govornik započne/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Izgubio sam nit/ })).not.toBeInTheDocument()
   })
 })
 
@@ -128,56 +150,23 @@ describe('question drawer', () => {
   })
 })
 
-describe('recording persists across drawers', () => {
-  it('keeps the microphone running while question / catch-up / explanation drawers open and close', async () => {
-    const { fn, calls } = fakeFetch([
+describe('drawers over the live transcript', () => {
+  it('opening and closing question / catch-up / explanation drawers keeps the transcript', async () => {
+    const { fn } = fakeFetch([
       ...base,
+      ...liveTalk,
       ({ path }) => (path === '/talks/t1/question-quota' ? json(200, { used: 0, limit: 3, remaining: 3 }) : undefined),
       ({ path, method }) => (path === '/talks/t1/questions' && method === 'GET' ? json(200, { items: [] }) : undefined),
-      ({ path }) =>
-        path === '/talks/t1/recordings'
-          ? json(200, { recording_id: 'r1', mode: 'live', started_at: '2026-10-10T10:00:00Z', sample_rate_hz: 16000, chunk_seconds: 1 })
-          : undefined,
-      ({ path }) => (path === '/recordings/r1/chunks' ? json(202, { sequence: 0, status: 'accepted' }) : undefined),
-      ({ path }) =>
-        path.startsWith('/recordings/r1/segments')
-          ? json(200, {
-              items: [{ id: 's0', sequence: 0, start_ms: 0, end_ms: 1000, text: 'Prvi segment o indeksima.', status: 'ready' }],
-              next_after_sequence: 0,
-              processing_lag_ms: 0,
-            })
-          : undefined,
     ])
-    const services = makeServices(fn)
     const user = userEvent.setup()
-    renderAt('/events/e1/talks/t1', services)
-
-    await user.click(await screen.findByRole('button', { name: /Pokreni transkripciju/ }))
-    await screen.findByText('Snima se', { selector: 'span.font-semibold' })
-    expect(services.capture.start).toHaveBeenCalledTimes(1)
-    services.capture.feed(new Float32Array(16000)) // one full 1 s chunk
-    await waitFor(() => expect(calls.some((c) => c.path === '/recordings/r1/chunks')).toBe(true))
-    await screen.findByText('Prvi segment o indeksima.')
-
-    await user.click(screen.getByRole('button', { name: 'Postavi pitanje' }))
-    await screen.findByRole('dialog')
-    await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: /Izgubio sam nit/ }))
-    await screen.findByRole('dialog')
-    await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'Objasni pojam' }))
-    await screen.findByRole('dialog')
-    await user.keyboard('{Escape}')
-
-    expect(services.recorder.getSnapshot().status).toBe('recording')
-    expect(services.capture.stop).not.toHaveBeenCalled()
-    expect(services.capture.start).toHaveBeenCalledTimes(1)
-
-    const chunkCall = calls.find((c) => c.path === '/recordings/r1/chunks')!
-    const form = chunkCall.body as FormData
-    expect(form.get('sequence')).toBe('0')
-    expect(form.get('start_ms')).toBe('0')
-    expect(form.get('end_ms')).toBe('1000')
-    expect((form.get('file') as File).type).toBe('audio/wav')
+    renderAt('/events/e1/talks/t1', makeServices(fn))
+    await screen.findByText('Govornik objašnjava HNSW indekse.')
+    for (const name of ['Postavi pitanje', 'Izgubio sam nit', 'Objasni pojam']) {
+      await user.click(screen.getByRole('button', { name: new RegExp(name) }))
+      await screen.findByRole('dialog')
+      await user.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    }
+    expect(screen.getByText('Govornik objašnjava HNSW indekse.')).toBeInTheDocument()
   })
 })

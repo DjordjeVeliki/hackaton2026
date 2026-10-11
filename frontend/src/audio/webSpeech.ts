@@ -1,13 +1,12 @@
 import type { Segment } from '../api/types'
 
 /*
- * Browser speech recognition (Web Speech API).
+ * Browser speech recognition (Web Speech API) on the speaker's device.
  *
- * NOT Gemma: the browser vendor performs the recognition (Chrome/Edge send the
- * audio to their own cloud speech service). The resulting transcript stays on
- * this device. It is NOT sent to the backend and is NOT the authoritative
- * transcript used for question evaluation. The server-side Gemma transcript
- * (RecordingController → backend → /transcribe) is unchanged.
+ * Recognition is performed by the browser vendor (Chrome/Edge use their own
+ * speech service), not by Gemma. Finalized utterances are published by
+ * SpeakerTranscription to the backend, where they become the talk's
+ * authoritative transcript that attendees read and Gemma summarizes/judges.
  */
 
 // Minimal typings: SpeechRecognition is not part of TypeScript's lib.dom.
@@ -87,6 +86,7 @@ export class WebSpeechTranscriber {
   private seq = 0
   private restarts = 0
   private listeners = new Set<() => void>()
+  private segmentListeners = new Set<(s: Segment) => void>()
   private snap: WebSpeechSnapshot
 
   constructor(deps: WebSpeechDeps = {}) {
@@ -106,6 +106,14 @@ export class WebSpeechTranscriber {
     }
   }
   getSnapshot = () => this.snap
+
+  /** Called once for every finalized utterance (used to publish the speaker's transcript). */
+  onSegment(cb: (s: Segment) => void) {
+    this.segmentListeners.add(cb)
+    return () => {
+      this.segmentListeners.delete(cb)
+    }
+  }
 
   start(lang = this.snap.lang) {
     if (!this.ctor || this.wanted) return
@@ -229,6 +237,7 @@ export class WebSpeechTranscriber {
     }
     this.seq++
     this.set({ segments: [...this.snap.segments, seg] })
+    this.segmentListeners.forEach((l) => l(seg))
   }
 
   private set(patch: Partial<WebSpeechSnapshot>) {

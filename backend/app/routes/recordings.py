@@ -13,7 +13,7 @@ from ..config import get_settings
 from ..errors import ApiError, ai_unavailable, bad_request, forbidden, not_found
 from ..policy import norm_topic
 from ..schemas import (CatchUp, CatchUpRequest, ChunkAccepted, Explanation, ExplainRequest, RecordingStarted,
-                       Segment, SegmentPage, Stopped)
+                       Segment, SegmentPage, Stopped, TalkTranscript, TextSegmentIn)
 from .events import private_profile_ref
 
 router = APIRouter()
@@ -78,6 +78,12 @@ def _bump_stat(event_id: str, field: str) -> None:
     firebase.db().collection("event_stats").document(event_id).set({field: gcf.Increment(1)}, merge=True)
 
 
+def is_trusted_source(talk: dict, uid: str) -> bool:
+    """Speakers of the talk and event organizers may produce the authoritative transcript."""
+    event = get_event(talk["event_id"])
+    return uid in talk.get("speaker_uids", []) or uid in event.get("organizer_uids", [])
+
+
 @router.post("/talks/{talk_id}/recordings", response_model=RecordingStarted)
 def start_recording(talk_id: str, user: User = Depends(current_user)):
     talk = get_talk(talk_id)
@@ -88,8 +94,66 @@ def start_recording(talk_id: str, user: User = Depends(current_user)):
     rec_ref(rid).set({"talk_id": talk_id, "event_id": talk["event_id"], "owner_uid": user.uid, "mode": "live",
                       "status": "active", "started_at": started, "sample_rate_hz": s.sample_rate_hz,
                       "chunk_seconds": s.chunk_seconds})
+    if user.uid in talk.get("speaker_uids", []):
+        # v1.1: the talk's own speaker starting transcription makes it the authoritative source and the talk live.
+        update = {"transcript_source": {"recording_id": rid, "configured_by": user.uid, "configured_at": started}}
+        if talk.get("status") == "scheduled":
+            update["status"] = "live"
+        firebase.db().collection("talks").document(talk_id).update(update)
     return RecordingStarted(recording_id=rid, mode="live", started_at=firebase.rfc3339(started),
                             sample_rate_hz=s.sample_rate_hz, chunk_seconds=s.chunk_seconds)
+
+
+@router.get("/talks/{talk_id}/transcript", response_model=TalkTranscript)
+def talk_transcript(talk_id: str, user: User = Depends(current_user)):
+    """v1.1: lets every event member find the talk's authoritative transcript recording."""
+    talk = get_talk(talk_id)
+    require_member(talk["event_id"], user)
+    rid = (talk.get("transcript_source") or {}).get("recording_id")
+    if not rid:
+        return TalkTranscript(recording_id=None, status="none")
+    snap = rec_ref(rid).get()
+    if not snap.exists:
+        return TalkTranscript(recording_id=None, status="none")
+    return TalkTranscript(recording_id=rid, status="active" if snap.get("status") == "active" else "stopped")
+
+
+@router.post("/recordings/{recording_id}/text-segments", response_model=ChunkAccepted, status_code=202)
+def upload_text_segment(recording_id: str, body: TextSegmentIn, user: User = Depends(current_user)):
+    """v1.1: text recognized on the speaker's device. Stored as a ready segment (no audio, no AI call)."""
+    s = get_settings()
+    rec = owned_recording(recording_id, user)
+    if not is_trusted_source(get_talk(rec["talk_id"]), user.uid):
+        raise forbidden("Only the talk's speaker or an organizer can publish transcript text")
+    if rec["status"] != "active":
+        raise ApiError(409, "RECORDING_STOPPED", "Recording is stopped")
+    text = " ".join(body.text.split())[:5000]
+    seq = body.sequence
+    existing = chunk_ref(recording_id, seq).get()
+    if existing.exists:  # idempotent retry
+        if existing.get("text") == text:  # stored start_ms may have been reconciled, so compare text only
+            return ChunkAccepted(sequence=seq)
+        raise ApiError(409, "CHUNK_CONFLICT", "A different segment with this sequence exists")
+    # Sequences must stay contiguous: GET /segments only returns a gap-free prefix.
+    if seq > 0 and not chunk_ref(recording_id, seq - 1).get().exists:
+        raise ApiError(409, "SEQUENCE_GAP", "Previous sequence has not been received")
+    start_ms, end_ms = body.start_ms, body.end_ms
+    if seq > 0:
+        start_ms = max(start_ms, chunk_ref(recording_id, seq - 1).get().get("end_ms"))
+    end_ms = max(end_ms, start_ms + 1)
+    elapsed_ms = int((firebase.now() - rec["started_at"]).total_seconds() * 1000)
+    if end_ms > elapsed_ms + s.clock_skew_ms:
+        raise bad_request("Segment ends in the future relative to recording start", "INVALID_CHUNK_TIMING")
+    started = rec["started_at"]
+    try:
+        chunk_ref(recording_id, seq).create({
+            "sequence": seq, "start_ms": start_ms, "end_ms": end_ms,
+            "start_at": started + timedelta(milliseconds=start_ms), "end_at": started + timedelta(milliseconds=end_ms),
+            "status": "ready", "text": text, "source": "speaker_device", "accepted_at": firebase.now(),
+            "processed_at": firebase.now()})
+    except AlreadyExists:
+        return ChunkAccepted(sequence=seq)
+    return ChunkAccepted(sequence=seq)
 
 
 @router.post("/recordings/{recording_id}/chunks", response_model=ChunkAccepted, status_code=202)

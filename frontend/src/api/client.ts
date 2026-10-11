@@ -118,6 +118,11 @@ export class ApiClient {
     form.append('end_ms', String(chunk.end_ms))
     return this.json('POST', `/recordings/${enc(recordingId)}/chunks`, s.chunkAccepted, { form, signal })
   }
+  /** v1.1: publish text recognized on the speaker's device. */
+  textSegment = (recordingId: string, seg: { sequence: number; start_ms: number; end_ms: number; text: string }) =>
+    this.json('POST', `/recordings/${enc(recordingId)}/text-segments`, s.chunkAccepted, { json: seg })
+  /** v1.1: which recording is the talk's live transcript. */
+  talkTranscript = (talkId: string) => this.json('GET', `/talks/${enc(talkId)}/transcript`, s.talkTranscript)
   segments = (recordingId: string, afterSequence: number, limit = 50) =>
     this.json('GET', `/recordings/${enc(recordingId)}/segments?after_sequence=${afterSequence}&limit=${limit}`, s.segmentPage)
   stopRecording = (recordingId: string) =>

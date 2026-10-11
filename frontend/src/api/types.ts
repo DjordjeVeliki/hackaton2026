@@ -98,6 +98,12 @@ export interface ChunkAccepted {
   status: 'accepted'
 }
 
+/** v1.1: the talk's authoritative transcript recording (started by the talk's speaker). */
+export interface TalkTranscript {
+  recording_id: string | null
+  status: 'none' | 'active' | 'stopped'
+}
+
 export interface SegmentPage {
   items: Segment[]
   next_after_sequence: number

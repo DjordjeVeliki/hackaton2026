@@ -11,6 +11,25 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Inputs below 16px make iOS Safari zoom the page on focus. */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
+a,
+button,
+[role='button'],
+label {
+  touch-action: manipulation;
 }
 
 body {

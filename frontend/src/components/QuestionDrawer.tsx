@@ -154,7 +154,7 @@ export function QuestionFab({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Postavi pitanje"
       title="Postavi pitanje"
-      className="fixed right-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl font-bold text-white shadow-lg hover:bg-brand-700"
+      className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 sm:bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl font-bold text-white shadow-lg hover:bg-brand-700"
     >
       ?
     </button>

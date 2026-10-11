@@ -1,32 +1,28 @@
-import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { hasRole, useMe, useTalks, useTranscript } from '../api/hooks'
+import { hasRole, useMe, useTalks, useTalkTranscript, useTranscript } from '../api/hooks'
 import { CatchUpDrawer } from '../components/CatchUpDrawer'
 import { ExplanationDrawer } from '../components/ExplanationDrawer'
 import { QuestionDrawer, QuestionFab } from '../components/QuestionDrawer'
-import { RecorderControls } from '../components/RecorderControls'
+import { SpeakerLive, useSpeakerTranscription } from '../components/SpeakerLive'
 import { Transcript, type TextSelection, type TranscriptHandle } from '../components/Transcript'
-import { useWebSpeech, WebSpeechPanel } from '../components/WebSpeechPanel'
-import { Button, ErrorAlert, Notice } from '../components/ui'
-import { useApi, useRecorder } from '../services'
+import { Badge, Button, ErrorAlert, Notice } from '../components/ui'
 
 export function TalkPage() {
   const { eventId = '', talkId = '' } = useParams()
-  const api = useApi()
   const talks = useTalks(eventId)
   const me = useMe()
   const talk = talks.data?.find((t) => t.id === talkId)
-  const { snap } = useRecorder()
-  const mine = snap.talkId === talkId
-  const recordingId = mine ? (snap.session?.recording_id ?? null) : null
-  const polling = mine && ['recording', 'paused', 'stopping', 'starting'].includes(snap.status)
-  const transcript = useTranscript(recordingId, polling)
+  const isSpeaker = hasRole(me.data?.roles, 'speaker')
+  const speaker = useSpeakerTranscription()
+
+  // Everyone (speaker included) reads the talk's authoritative transcript from the server.
+  const source = useTalkTranscript(talkId)
+  const recordingId = source.data?.recording_id ?? null
+  const live = source.data?.status === 'active'
+  const transcript = useTranscript(recordingId, live)
   const segments = transcript.data?.segments ?? []
   const transcriptRef = useRef<TranscriptHandle>(null)
-  const ws = useWebSpeech()
-  // Browser (Web Speech API) transcript is shown when there is no server recording for this talk.
-  const showWebSpeech = !recordingId && (ws.snap.status === 'listening' || ws.snap.segments.length > 0 || !!ws.snap.interim)
 
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [explain, setExplain] = useState<{ term: string; segmentId: string | null } | null>(null)
@@ -34,73 +30,57 @@ export function TalkPage() {
   const [questionsOpen, setQuestionsOpen] = useState(false)
 
   const lastReady = [...segments].reverse().find((s) => s.status === 'ready') ?? null
+  const speakingHere = speaker.snap.talkId === talkId && speaker.controller.isActive
 
-  const designate = useMutation({
-    mutationFn: () => api.setTranscriptSource(talkId, recordingId!),
-  })
-
-  // Warn before leaving the page while audio is still being captured or uploaded.
+  // Leaving the page would stop the speaker's microphone on most phones.
   useEffect(() => {
-    if (!mine || !['recording', 'stopping'].includes(snap.status)) return
+    if (!speakingHere) return
     const h = (e: BeforeUnloadEvent) => e.preventDefault()
     window.addEventListener('beforeunload', h)
     return () => window.removeEventListener('beforeunload', h)
-  }, [mine, snap.status])
+  }, [speakingHere])
 
   return (
     <div className="space-y-3">
-      <div>
-        <h1 className="text-xl font-bold sm:text-2xl">{talk?.title ?? 'Predavanje'}</h1>
-        {talk && <p className="text-slate-600">{talk.speaker_name}</p>}
-      </div>
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl leading-tight font-bold sm:text-2xl">{talk?.title ?? 'Predavanje'}</h1>
+          {talk && <p className="truncate text-slate-600">{talk.speaker_name}</p>}
+        </div>
+        {live ? <Badge tone="red">● Uživo</Badge> : talk?.status === 'ended' ? <Badge>Završeno</Badge> : null}
+      </header>
       {talks.isError && <ErrorAlert error={talks.error} onRetry={() => talks.refetch()} />}
 
-      <RecorderControls talkId={talkId} eventId={eventId} talkEnded={talk?.status === 'ended'} />
-      <WebSpeechPanel />
-
-      {hasRole(me.data?.roles, 'organizer') && recordingId && (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Button size="sm" variant="secondary" onClick={() => designate.mutate()} disabled={designate.isPending || designate.isSuccess}>
-            {designate.isSuccess ? 'Označeno kao zvanični izvor ✓' : 'Označi ovaj snimak kao zvanični izvor transkripta'}
-          </Button>
-          {designate.isError && <ErrorAlert error={designate.error} />}
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={() => setCatchUpOpen(true)}>
-          🧭 Izgubio sam nit
-        </Button>
-        <Button variant="secondary" onClick={() => setExplain({ term: '', segmentId: lastReady?.id ?? null })} disabled={!recordingId}>
-          Objasni pojam
-        </Button>
-      </div>
-
-      {!recordingId && !showWebSpeech && (
-        <Notice>
-          Transkript, „Izgubio sam nit" i objašnjenja pojmova rade nad snimkom sa vašeg telefona. Pitanje govorniku možete postaviti i bez
-          snimanja.
-        </Notice>
-      )}
-      {transcript.isError && <ErrorAlert error={transcript.error} onRetry={() => transcript.refetch()} />}
+      {isSpeaker && <SpeakerLive talkId={talkId} />}
 
       {recordingId && (
-        <Transcript ref={transcriptRef} segments={segments} lagMs={transcript.data?.lagMs ?? 0} onSelectText={setSelection} />
+        <div className="grid grid-cols-2 gap-2">
+          <Button className="min-h-12" variant="secondary" onClick={() => setCatchUpOpen(true)}>
+            🧭 Izgubio sam nit
+          </Button>
+          <Button className="min-h-12" variant="secondary" onClick={() => setExplain({ term: '', segmentId: lastReady?.id ?? null })}>
+            Objasni pojam
+          </Button>
+        </div>
       )}
 
-      {showWebSpeech && (
-        <div className="space-y-2">
-          <Transcript segments={ws.snap.segments} lagMs={0} onSelectText={() => undefined} />
-          {ws.snap.interim && (
-            <p className="rounded-lg bg-slate-50 px-4 py-2 text-lg text-slate-500 italic" aria-live="polite">
-              {ws.snap.interim}…
-            </p>
-          )}
-        </div>
+      {source.isError && <ErrorAlert error={source.error} onRetry={() => source.refetch()} />}
+      {transcript.isError && <ErrorAlert error={transcript.error} onRetry={() => transcript.refetch()} />}
+
+      {recordingId ? (
+        <Transcript ref={transcriptRef} segments={segments} lagMs={transcript.data?.lagMs ?? 0} onSelectText={setSelection} />
+      ) : (
+        source.isSuccess && (
+          <Notice>
+            {isSpeaker
+              ? 'Pokrenite transkripciju kada počnete predavanje — publika će tekst videti uživo na svojim telefonima.'
+              : 'Transkript će se pojaviti automatski čim govornik započne predavanje. Pitanje govorniku možete postaviti već sada.'}
+          </Notice>
+        )
       )}
 
       {selection && (
-        <div className="fixed inset-x-0 bottom-24 z-20 flex justify-center px-4">
+        <div className="fixed inset-x-0 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] sm:bottom-24 z-20 flex justify-center px-4">
           <Button
             className="max-w-full shadow-lg"
             onMouseDown={(e) => e.preventDefault()}
@@ -114,9 +94,9 @@ export function TalkPage() {
         </div>
       )}
 
-      <QuestionFab onClick={() => setQuestionsOpen(true)} />
+      {!isSpeaker && <QuestionFab onClick={() => setQuestionsOpen(true)} />}
 
-      <QuestionDrawer talkId={talkId} open={questionsOpen} onOpenChange={setQuestionsOpen} />
+      {!isSpeaker && <QuestionDrawer talkId={talkId} open={questionsOpen} onOpenChange={setQuestionsOpen} />}
       <CatchUpDrawer
         recordingId={recordingId}
         segments={segments}

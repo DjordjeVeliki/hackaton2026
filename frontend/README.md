@@ -1,7 +1,8 @@
 # Cuevia — frontend
 
 React + TypeScript + Vite UI for Cuevia. Talks only to the **public backend API** (`contracts/http-v1.md`, v1).
-It never calls the private AI service, Gemma, a search API, or browser speech recognition.
+It never calls the private AI service, Gemma or a search API. On the speaker's phone it uses browser speech
+recognition (Web Speech API) to publish the live transcript; attendees only read it from the backend.
 
 Owner: Laptop 1 (`feature/frontend`). This folder is the only write scope of that role.
 
@@ -63,14 +64,20 @@ public/worklets/pcm-capture.js  AudioWorkletProcessor (mono downmix only)
 - **Transcript**: polls `segments?after_sequence=<cursor>` every 2 s while recording (and while
   `processing_lag_ms > 0`), merges only unseen sequences, shows `gap` segments as visible breaks. History slider +
   “Vrati se uživo”.
-- **Browser transcript (Web Speech API)**: the “Transkript u pregledaču” panel on the talk page
-  (`src/audio/webSpeech.ts`, `src/components/WebSpeechPanel.tsx`). It uses `SpeechRecognition` /
-  `webkitSpeechRecognition` (Chrome, Edge; not Firefox) with continuous and interim results, sr-RS/hr-HR/en-US.
-  The browser ends sessions after silence, so the panel restarts them automatically. Results become
-  local `ws-N` segments shown in the same transcript view while there is no server recording. **This is
-  not Gemma**: Chrome/Edge send the audio to the vendor's speech service. That is why the UI carries the label
-  “nije Gemma”. The text stays on the device: it is not sent to the backend, it is not the authoritative
-  transcript for question evaluation, and catch-up/explanations still need a server recording.
+- **Live transcript (speaker-driven, v1.1)**: only a user with the `speaker` role sees one large
+  “▶ Pokreni transkripciju” button on the talk page (`components/SpeakerLive.tsx`). Pressing it calls
+  `POST /talks/{id}/recordings`. For the talk's own speaker the backend makes that recording the talk's transcript
+  source and sets the talk `live`. The speaker's browser recognizes speech (Web Speech API, sr-RS/hr-HR/en-US,
+  auto-restart, screen wake lock) and `audio/speakerTranscription.ts` publishes every finalized utterance in order
+  to `POST /recordings/{id}/text-segments`. Sequences are assigned at send time, network errors retry with the
+  same sequence, and rejected text is dropped without leaving a gap. Attendees never record: the page finds the
+  live recording through `GET /talks/{id}/transcript` (polled every 4 s) and reads segments as before. Catch-up,
+  explanations and question context therefore all run on the speaker's transcript. Speakers don't get the
+  question button. Recognition is done by the browser vendor's speech service (Chrome/Edge), not by Gemma.
+- **Mobile**: bottom tab bar on phones, safe-area insets (notch/home indicator), ≥44 px touch targets,
+  16 px inputs (no iOS zoom), no tap flash or overscroll bounce, installable PWA (`public/manifest.webmanifest`,
+  icons). Routes are lazy-loaded and libraries are split into long-cached chunks (react / firebase / vendor).
+  Firebase Auth uses `initializeAuth`, and the Google popup code loads only on demand.
 - **Izgubio sam nit**: 30 s / 1 min / 3 min / from start, computed from the latest segment `end_ms`.
 - **Explanations**: select text in the transcript (or type a term) → drawer; depth buttons re-query backend.
   `retrieval_mode: general` is labeled “Opšte znanje modela — bez web izvora”. Only http(s) links, opened with

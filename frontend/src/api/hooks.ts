@@ -9,6 +9,7 @@ export const qk = {
   talks: (eventId: string) => ['talks', eventId] as const,
   profile: (eventId: string) => ['profile', eventId] as const,
   segments: (recordingId: string) => ['segments', recordingId] as const,
+  talkTranscript: (talkId: string) => ['talk-transcript', talkId] as const,
   quota: (talkId: string) => ['quota', talkId] as const,
   myQuestions: (talkId: string) => ['my-questions', talkId] as const,
   speakerQuestions: (eventId: string) => ['speaker-questions', eventId] as const,
@@ -48,6 +49,16 @@ export function useProfile(eventId: string) {
  * Incremental transcript: each poll asks only for sequences after the cursor
  * and merges unseen ones into the cached state (kept across drawers/screens).
  */
+/** v1.1: find the talk's live transcript; polls until it exists and while it is active. */
+export function useTalkTranscript(talkId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: qk.talkTranscript(talkId),
+    queryFn: () => api.talkTranscript(talkId),
+    refetchInterval: (q) => (q.state.data?.status === 'stopped' ? 15000 : 4000),
+  })
+}
+
 export function useTranscript(recordingId: string | null, poll: boolean) {
   const api = useApi()
   const qc = useQueryClient()

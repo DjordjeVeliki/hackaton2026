@@ -32,6 +32,8 @@ GET /recordings/{recording_id}/segments?after_sequence=-1&limit=50 -> {items:Seg
 POST /recordings/{recording_id}/stop -> {status:"stopped"}
 POST /recordings/{recording_id}/catch-up body {start_ms:int,end_ms:int} -> CatchUp
 POST /recordings/{recording_id}/explanations body {selected_text:string,segment_id:string,depth:"simple"|"standard"|"advanced"} -> Explanation
+POST /recordings/{recording_id}/text-segments body {sequence:int,start_ms:int,end_ms:int,text:string} -> 202 {sequence:int,status:"accepted"}; v1.1, owner must be the talk's speaker or an organizer; sequences contiguous (409 SEQUENCE_GAP), idempotent per sequence
+GET /talks/{talk_id}/transcript -> {recording_id:string|null,status:"none"|"active"|"stopped"}; v1.1, event members; the talk's authoritative transcript recording
 GET /talks/{talk_id}/question-quota -> {used:int,limit:3,remaining:int}
 GET /talks/{talk_id}/questions -> {items:QuestionPublic[]} belonging to authenticated attendee
 POST /talks/{talk_id}/questions body {text:string,client_request_id:string} -> 201 {question:QuestionPublic,quota:{used:int,limit:3,remaining:int}}; repeated idempotent request returns same result, never consumes another slot
@@ -46,6 +48,8 @@ GET /sponsor/events/{event_id}/participants/{participant_id}/cv -> authorized fi
 POST /organizer/talks/{talk_id}/transcript-source body {recording_id:string} -> {configured:true}; trusted organizer-designated source only
 POST /organizer/events/{event_id}/finalize-shortlists -> {snapshot_id:string,status:"finalized"}
 GET /organizer/events/{event_id}/metrics -> {attendee_count:int,cv_parsed_count:int,na_count:int,question_count:int,catch_up_count:int,requested_terms:[{term,count}],interest_distribution:[{topic,count}],share_count:int}
+
+v1.1 (additive, 2026-10-11): when the talk's own speaker calls POST /talks/{talk_id}/recordings, that recording automatically becomes the talk's transcript source and a "scheduled" talk becomes "live". The speaker's device publishes recognized text through /text-segments; attendees find the recording with GET /talks/{talk_id}/transcript and poll its segments as usual.
 
 For v1, poll segments around every 2 seconds while active; only append unseen sequence IDs. Poll CV status after upload until parsed/failed. Chat stores messages, never returns a generated answer.
 ```

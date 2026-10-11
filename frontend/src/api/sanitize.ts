@@ -21,6 +21,7 @@ import type {
   SegmentPage,
   Source,
   Talk,
+  TalkTranscript,
 } from './types'
 
 export class ContractError extends Error {
@@ -185,6 +186,11 @@ export function recordingSession(v: unknown): RecordingSession {
 export function chunkAccepted(v: unknown): ChunkAccepted {
   const o = obj(v, 'chunk')
   return { sequence: int(o, 'sequence'), status: oneOf(o, 'status', ['accepted'] as const) }
+}
+
+export function talkTranscript(v: unknown): TalkTranscript {
+  const o = obj(v, 'transcript')
+  return { recording_id: strOrNull(o, 'recording_id'), status: oneOf(o, 'status', ['none', 'active', 'stopped'] as const) }
 }
 
 export function segmentPage(v: unknown): SegmentPage {
