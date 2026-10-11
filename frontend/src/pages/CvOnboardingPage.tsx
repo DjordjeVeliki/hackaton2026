@@ -1,12 +1,16 @@
-import { Link, useParams } from 'react-router-dom'
-import { useProfile } from '../api/hooks'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import { hasRole, useMe, useProfile } from '../api/hooks'
 import { CvPanel } from '../components/CvPanel'
 import { Card, ErrorAlert, Spinner } from '../components/ui'
 
 /** Optional step right after joining an event. Skipping is always allowed. */
 export function CvOnboardingPage() {
   const { eventId = '' } = useParams()
-  const profile = useProfile(eventId)
+  const me = useMe()
+  const isSpeaker = hasRole(me.data?.roles, 'speaker')
+  const profile = useProfile(eventId, !isSpeaker)
+  // Speakers are never asked for a CV.
+  if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <h1 className="text-2xl font-bold">Želite li da dodate CV?</h1>

@@ -86,3 +86,35 @@ describe('speaker live transcription', () => {
     await screen.findByRole('button', { name: /Pokreni transkripciju/ })
   })
 })
+
+describe('speakers are never asked for a CV', () => {
+  const speakerRoutes: Route[] = [
+    ({ path }) => (path === '/me' ? json(200, { user_id: 'sp', display_name: 'Govornik', roles: ['speaker'] }) : undefined),
+    ({ path }) => (path === '/events' ? json(200, { items: [{ id: 'e1', title: 'Konferencija' }], next_cursor: null }) : undefined),
+    ({ path }) => (path === '/events/e1/join' ? json(200, { joined: true }) : undefined),
+    ({ path }) =>
+      path === '/events/e1/talks'
+        ? json(200, { items: [{ id: 't1', title: 'Zero trust', speaker_name: 'Govornik', status: 'scheduled' }] })
+        : undefined,
+  ]
+
+  it('joining goes straight to the talks, with no profile/CV card or Profil tab', async () => {
+    const { fn, calls } = fakeFetch(speakerRoutes)
+    const user = userEvent.setup()
+    renderAt('/events', makeServices(fn))
+    await user.click(await screen.findByRole('button', { name: 'Pridruži se' }))
+    expect(await screen.findByText('Zero trust')).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/events/e1')
+    expect(screen.queryByText('Vaš profil')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Profil/ })).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
+  })
+
+  it('the CV and profile pages redirect a speaker to the talks', async () => {
+    const { fn, calls } = fakeFetch(speakerRoutes)
+    renderAt('/events/e1/cv', makeServices(fn))
+    expect(await screen.findByText('Zero trust')).toBeInTheDocument()
+    expect(screen.queryByText('Želite li da dodate CV?')).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/events/e1/profile')).toBe(false)
+  })
+})

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
-import { qk, useProfile } from '../api/hooks'
+import { Navigate, useParams } from 'react-router-dom'
+import { hasRole, qk, useMe, useProfile } from '../api/hooks'
 import type { Consent, InterestSource, Opportunity, ProfilePublic } from '../api/types'
 import { CvPanel } from '../components/CvPanel'
 import { Badge, Button, Card, EmptyState, ErrorAlert, Field, inputClass, Notice, Spinner } from '../components/ui'
@@ -11,7 +11,11 @@ const SOURCE_LABEL: Record<InterestSource, string> = { cv: 'iz CV-a', question: 
 
 export function ProfilePage() {
   const { eventId = '' } = useParams()
-  const profile = useProfile(eventId)
+  const me = useMe()
+  const isSpeaker = hasRole(me.data?.roles, 'speaker')
+  const profile = useProfile(eventId, !isSpeaker)
+  // CV, interests and sponsor sharing are attendee features; speakers are never asked for a CV.
+  if (isSpeaker) return <Navigate to={`/events/${eventId}`} replace />
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Profil</h1>

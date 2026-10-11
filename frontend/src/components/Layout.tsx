@@ -31,7 +31,7 @@ export function Layout() {
         ...(hasRole(roles, 'speaker') ? [{ to: `/speaker/events/${eventId}`, label: 'Pitanja', icon: '💬' }] : []),
         ...(hasRole(roles, 'sponsor') ? [{ to: `/sponsor/events/${eventId}`, label: 'Sponzor', icon: '🤝' }] : []),
         ...(hasRole(roles, 'organizer') ? [{ to: `/organizer/events/${eventId}`, label: 'Organizator', icon: '📊' }] : []),
-        { to: `/events/${eventId}/profile`, label: 'Profil', icon: '👤' },
+        ...(hasRole(roles, 'speaker') ? [] : [{ to: `/events/${eventId}/profile`, label: 'Profil', icon: '👤' }]),
       ]
     : []
 

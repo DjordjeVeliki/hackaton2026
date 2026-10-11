@@ -36,10 +36,11 @@ export function useTalks(eventId: string) {
 const CV_PENDING: CvStatus[] = ['uploaded', 'processing']
 
 /** Polls while the CV is being processed, then stops. */
-export function useProfile(eventId: string) {
+export function useProfile(eventId: string, enabled = true) {
   const api = useApi()
   return useQuery({
     queryKey: qk.profile(eventId),
+    enabled,
     queryFn: () => api.profile(eventId),
     refetchInterval: (q) => (q.state.data && CV_PENDING.includes(q.state.data.cv_status) ? 2000 : false),
   })

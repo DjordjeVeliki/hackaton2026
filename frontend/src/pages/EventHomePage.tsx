@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { useProfile, useTalks } from '../api/hooks'
+import { hasRole, useMe, useProfile, useTalks } from '../api/hooks'
 import type { TalkStatus } from '../api/types'
 import { ProfileStatus } from '../components/CvPanel'
 import { Badge, Card, EmptyState, ErrorAlert, Spinner } from '../components/ui'
@@ -13,10 +13,13 @@ const TALK_STATUS: Record<TalkStatus, { text: string; tone: 'green' | 'slate' | 
 export function EventHomePage() {
   const { eventId = '' } = useParams()
   const talks = useTalks(eventId)
-  const profile = useProfile(eventId)
+  const me = useMe()
+  const isSpeaker = hasRole(me.data?.roles, 'speaker')
+  const profile = useProfile(eventId, !isSpeaker && me.isSuccess)
 
   return (
     <div className="space-y-4">
+      {!isSpeaker && me.isSuccess && (
       <Card
         title="Vaš profil"
         actions={
@@ -29,6 +32,7 @@ export function EventHomePage() {
         {profile.isError && <ErrorAlert error={profile.error} onRetry={() => profile.refetch()} />}
         {profile.data && <ProfileStatus profile={profile.data} />}
       </Card>
+      )}
 
       <h1 className="text-2xl font-bold">Predavanja</h1>
       {talks.isPending && <Spinner />}
